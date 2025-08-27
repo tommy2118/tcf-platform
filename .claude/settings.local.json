@@ -1,5 +1,11 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(rspec:*)",
+      "Bash(git add:*)",
+      "Bash(bundle install:*)",
+      "Bash(bundle exec rspec:*)"
+    ],
     "additionalDirectories": [
       "/Users/tcaruso/src/tcf-gateway"
     ]

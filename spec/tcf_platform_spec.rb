@@ -9,7 +9,7 @@ RSpec.describe TcfPlatform do
 
   describe '.app' do
     it 'returns a Sinatra application' do
-      expect(TcfPlatform.app).to be_a(Sinatra::Base)
+      expect(TcfPlatform.app).to be < Sinatra::Base
     end
   end
 

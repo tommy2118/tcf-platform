@@ -2,6 +2,7 @@ require 'rspec'
 require 'rack/test'
 require 'webmock/rspec'
 require 'json'
+require_relative '../lib/tcf_platform'
 
 # Test coverage
 if ENV['COVERAGE'] == 'true'
