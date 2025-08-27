@@ -1,0 +1,771 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-scan:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.4'
+        bundler-cache: true
+    
+    - name: Create results directory
+      run: mkdir -p security-results
+    
+    - name: Run Bundler Audit (comprehensive)
+      run: |
+        # Update advisory database first
+        bundle exec bundle-audit update
+        
+        # Run detailed scan
+        bundle exec bundle-audit check \
+          --format json \
+          --output security-results/bundler-audit.json
+        
+        bundle exec bundle-audit check \
+          --format txt \
+          --output security-results/bundler-audit.txt
+      continue-on-error: true
+    
+    - name: Ruby Advisory Database check
+      run: |
+        # Create enhanced dependency security check
+        cat > dependency_security_check.rb << 'EOF'
+        require 'bundler'
+        require 'json'
+        require 'net/http'
+        require 'uri'
+        
+        # Parse Gemfile.lock
+        lockfile = Bundler::LockfileParser.new(File.read('Gemfile.lock'))
+        
+        vulnerabilities = []
+        outdated_gems = []
+        
+        puts "Analyzing #{lockfile.specs.length} gems..."
+        
+        lockfile.specs.each_with_index do |spec, index|
+          puts "Checking #{spec.name} #{spec.version}... (#{index + 1}/#{lockfile.specs.length})"
+          
+          # Check for known vulnerable versions based on common patterns
+          case spec.name
+          when 'rack'
+            if spec.version < Gem::Version.new('2.2.4')
+              vulnerabilities << {
+                gem: spec.name,
+                version: spec.version.to_s,
+                issue: 'Known security vulnerability - upgrade to >= 2.2.4',
+                severity: 'HIGH',
+                cve: 'CVE-2020-8184'
+              }
+            end
+          when 'sinatra'
+            if spec.version < Gem::Version.new('2.1.0')
+              vulnerabilities << {
+                gem: spec.name,
+                version: spec.version.to_s,
+                issue: 'Known security vulnerability - upgrade to >= 2.1.0',
+                severity: 'MEDIUM',
+                cve: 'Multiple CVEs'
+              }
+            end
+          when 'nokogiri'
+            if spec.version < Gem::Version.new('1.13.10')
+              vulnerabilities << {
+                gem: spec.name,
+                version: spec.version.to_s,
+                issue: 'XML external entity (XXE) vulnerability - upgrade to >= 1.13.10',
+                severity: 'HIGH',
+                cve: 'CVE-2022-29181'
+              }
+            end
+          when 'actionpack', 'activerecord', 'activesupport'
+            if spec.version < Gem::Version.new('7.0.4')
+              vulnerabilities << {
+                gem: spec.name,
+                version: spec.version.to_s,
+                issue: 'Rails security vulnerability - upgrade to >= 7.0.4',
+                severity: 'HIGH',
+                cve: 'Multiple CVEs'
+              }
+            end
+          end
+          
+          # Check for very old versions (potential security risk)
+          gem_age_threshold = Time.now - (365 * 24 * 60 * 60) # 1 year ago
+          if spec.version.to_s.match?(/^[01]\./) # Major version 0 or 1
+            outdated_gems << {
+              gem: spec.name,
+              version: spec.version.to_s,
+              issue: 'Very old major version - consider upgrading',
+              severity: 'LOW'
+            }
+          end
+        end
+        
+        # Write results
+        results = {
+          scan_date: Time.now.iso8601,
+          total_gems: lockfile.specs.length,
+          vulnerabilities: vulnerabilities,
+          outdated_gems: outdated_gems,
+          summary: {
+            high_severity: vulnerabilities.count { |v| v[:severity] == 'HIGH' },
+            medium_severity: vulnerabilities.count { |v| v[:severity] == 'MEDIUM' },
+            low_severity: vulnerabilities.count { |v| v[:severity] == 'LOW' },
+            outdated_count: outdated_gems.length
+          }
+        }
+        
+        File.write('security-results/custom-dependency-audit.json', JSON.pretty_generate(results))
+        
+        # Output summary
+        if vulnerabilities.any?
+          puts "\n⚠️  Custom dependency scan found #{vulnerabilities.length} potential vulnerabilities:"
+          vulnerabilities.each do |vuln|
+            puts "  - #{vuln[:gem]} #{vuln[:version]}: #{vuln[:issue]} [#{vuln[:severity]}]"
+          end
+        else
+          puts "\n✅ Custom dependency scan found no known vulnerabilities"
+        end
+        
+        if outdated_gems.any?
+          puts "\n📦 Found #{outdated_gems.length} potentially outdated gems"
+        end
+        EOF
+        
+        bundle exec ruby dependency_security_check.rb
+      continue-on-error: true
+    
+    - name: License compliance check
+      run: |
+        cat > license_check.rb << 'EOF'
+        require 'bundler'
+        require 'json'
+        
+        # Known problematic licenses
+        PROBLEMATIC_LICENSES = [
+          'GPL-3.0', 'GPL-2.0', 'AGPL-3.0', 'LGPL-3.0',
+          'CDDL-1.0', 'EPL-1.0', 'MPL-2.0'
+        ].freeze
+        
+        # Parse Gemfile.lock
+        lockfile = Bundler::LockfileParser.new(File.read('Gemfile.lock'))
+        
+        license_issues = []
+        
+        puts "Checking licenses for #{lockfile.specs.length} gems..."
+        
+        # This is a basic check - in practice you'd use gem metadata
+        # For now, we'll just flag gems that commonly have license issues
+        risky_gems = %w[
+          mysql2 pg sqlite3 redis-rb sidekiq
+          ffi nokogiri eventmachine
+        ]
+        
+        lockfile.specs.each do |spec|
+          if risky_gems.include?(spec.name)
+            license_issues << {
+              gem: spec.name,
+              version: spec.version.to_s,
+              issue: 'Review license compatibility',
+              severity: 'INFO'
+            }
+          end
+        end
+        
+        results = {
+          scan_date: Time.now.iso8601,
+          license_issues: license_issues
+        }
+        
+        File.write('security-results/license-audit.json', JSON.pretty_generate(results))
+        
+        if license_issues.any?
+          puts "📄 Found #{license_issues.length} gems requiring license review"
+        else
+          puts "✅ No license compliance issues detected"
+        end
+        EOF
+        
+        bundle exec ruby license_check.rb
+      continue-on-error: true
+    
+    - name: Upload dependency scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dependency-security-scan
+        path: security-results/
+        retention-days: 30
+
+  static-analysis:
+    name: Static Code Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.4'
+        bundler-cache: true
+    
+    - name: Create results directory
+      run: mkdir -p security-results
+    
+    - name: Run Brakeman (comprehensive)
+      run: |
+        # Run Brakeman with comprehensive security analysis
+        bundle exec brakeman \
+          --format json \
+          --output security-results/brakeman.json \
+          --confidence-level 1 \
+          --no-pager \
+          --force
+        
+        bundle exec brakeman \
+          --format text \
+          --output security-results/brakeman.txt \
+          --confidence-level 1 \
+          --no-pager \
+          --force
+        
+        # Generate markdown report
+        bundle exec brakeman \
+          --format markdown \
+          --output security-results/brakeman.md \
+          --confidence-level 1 \
+          --no-pager \
+          --force
+      continue-on-error: true
+    
+    - name: Run RuboCop security cops
+      run: |
+        bundle exec rubocop \
+          --only Security \
+          --format json \
+          --out security-results/rubocop-security.json
+        
+        bundle exec rubocop \
+          --only Security \
+          --format simple \
+          --out security-results/rubocop-security.txt
+      continue-on-error: true
+    
+    - name: Custom security pattern analysis
+      run: |
+        echo "Running custom security pattern analysis..."
+        
+        cat > security_patterns.sh << 'EOF'
+        #!/bin/bash
+        
+        echo "# 🔐 Custom Security Pattern Analysis" > security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> security-results/custom-patterns.md
+        echo "**Repository:** ${{ github.repository }}" >> security-results/custom-patterns.md
+        echo "**Commit:** ${{ github.sha }}" >> security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        
+        # Check for hardcoded secrets patterns
+        echo "## 🔑 Hardcoded Secrets Analysis" >> security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        
+        SECRET_PATTERNS=(
+          "password\s*[=:]\s*['\"][^'\"]{8,}['\"]"
+          "secret\s*[=:]\s*['\"][^'\"]{16,}['\"]"
+          "api_key\s*[=:]\s*['\"][^'\"]{20,}['\"]"
+          "private_key\s*[=:]\s*['\"].*['\"]"
+          "token\s*[=:]\s*['\"][^'\"]{20,}['\"]"
+          "jwt_secret\s*[=:]\s*['\"][^'\"]{16,}['\"]"
+          "database_url\s*[=:]\s*['\"].*password.*['\"]"
+          "redis_url\s*[=:]\s*['\"].*password.*['\"]"
+        )
+        
+        SECRETS_FOUND=false
+        for pattern in "${SECRET_PATTERNS[@]}"; do
+          results=$(grep -rn --include="*.rb" --include="*.yml" --include="*.yaml" -iE "$pattern" . | grep -v ".env.example" | grep -v "spec/" | grep -v "test/" | head -10)
+          if [ -n "$results" ]; then
+            echo "### ⚠️ Pattern: \`$pattern\`" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "$results" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "" >> security-results/custom-patterns.md
+            SECRETS_FOUND=true
+          fi
+        done
+        
+        if [ "$SECRETS_FOUND" = false ]; then
+          echo "✅ **No hardcoded secrets detected**" >> security-results/custom-patterns.md
+        fi
+        echo "" >> security-results/custom-patterns.md
+        
+        # Check for SQL injection patterns
+        echo "## 🗃️ SQL Injection Analysis" >> security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        
+        SQL_PATTERNS=(
+          "execute\s*\(\s*['\"].*\#\{.*\}.*['\"]"
+          "query\s*\(\s*['\"].*\#\{.*\}.*['\"]"
+          "find_by_sql\s*\(\s*['\"].*\#\{.*\}.*['\"]"
+          "where\s*\(\s*['\"].*\#\{.*\}.*['\"]"
+        )
+        
+        SQL_ISSUES_FOUND=false
+        for pattern in "${SQL_PATTERNS[@]}"; do
+          results=$(grep -rn --include="*.rb" -iE "$pattern" . | head -5)
+          if [ -n "$results" ]; then
+            echo "### ⚠️ Pattern: \`$pattern\`" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "$results" >> security-results/custom-patterns.md  
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "" >> security-results/custom-patterns.md
+            SQL_ISSUES_FOUND=true
+          fi
+        done
+        
+        if [ "$SQL_ISSUES_FOUND" = false ]; then
+          echo "✅ **No SQL injection patterns detected**" >> security-results/custom-patterns.md
+        fi
+        echo "" >> security-results/custom-patterns.md
+        
+        # Check for unsafe eval/exec usage
+        echo "## ⚡ Code Execution Analysis" >> security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        
+        EXEC_PATTERNS=(
+          "eval\s*\("
+          "instance_eval\s*\("
+          "class_eval\s*\("
+          "module_eval\s*\("
+          "exec\s*\("
+          "system\s*\("
+          "spawn\s*\("
+          "\`.*\#\{.*\}.*\`"
+        )
+        
+        EXEC_ISSUES_FOUND=false
+        for pattern in "${EXEC_PATTERNS[@]}"; do
+          results=$(grep -rn --include="*.rb" -iE "$pattern" . | grep -v "spec/" | grep -v "test/" | head -5)
+          if [ -n "$results" ]; then
+            echo "### ⚠️ Pattern: \`$pattern\`" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "$results" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "" >> security-results/custom-patterns.md
+            EXEC_ISSUES_FOUND=true
+          fi
+        done
+        
+        if [ "$EXEC_ISSUES_FOUND" = false ]; then
+          echo "✅ **No unsafe execution patterns detected**" >> security-results/custom-patterns.md
+        fi
+        echo "" >> security-results/custom-patterns.md
+        
+        # Check for insecure Docker patterns (TCF Platform specific)
+        echo "## 🐳 Docker Security Analysis" >> security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        
+        if [ -f Dockerfile ]; then
+          echo "### Dockerfile Security Check" >> security-results/custom-patterns.md
+          echo "" >> security-results/custom-patterns.md
+          
+          # Check for root user
+          if ! grep -q "USER" Dockerfile; then
+            echo "⚠️ **No USER directive** - container may run as root" >> security-results/custom-patterns.md
+          else
+            echo "✅ USER directive found" >> security-results/custom-patterns.md
+          fi
+          
+          # Check for latest tags
+          if grep -q "FROM.*:latest" Dockerfile; then
+            echo "⚠️ **Using :latest tags** - consider pinning versions" >> security-results/custom-patterns.md
+          else
+            echo "✅ Base images use specific tags" >> security-results/custom-patterns.md
+          fi
+        fi
+        
+        # Check for environment variable exposure
+        echo "## 🌍 Environment Variable Security" >> security-results/custom-patterns.md
+        echo "" >> security-results/custom-patterns.md
+        
+        ENV_PATTERNS=(
+          "ENV.*SECRET"
+          "ENV.*PASSWORD"
+          "ENV.*TOKEN"
+          "ENV.*KEY"
+        )
+        
+        ENV_ISSUES_FOUND=false
+        for pattern in "${ENV_PATTERNS[@]}"; do
+          results=$(grep -rn --include="Dockerfile" --include="*.yml" --include="*.yaml" -iE "$pattern" . | head -5)
+          if [ -n "$results" ]; then
+            echo "### ⚠️ Pattern: \`$pattern\`" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "$results" >> security-results/custom-patterns.md
+            echo "\`\`\`" >> security-results/custom-patterns.md
+            echo "" >> security-results/custom-patterns.md
+            ENV_ISSUES_FOUND=true
+          fi
+        done
+        
+        if [ "$ENV_ISSUES_FOUND" = false ]; then
+          echo "✅ **No environment variable security issues detected**" >> security-results/custom-patterns.md
+        fi
+        
+        echo "" >> security-results/custom-patterns.md
+        echo "---" >> security-results/custom-patterns.md
+        echo "*Generated by TCF Platform Security Pipeline*" >> security-results/custom-patterns.md
+        EOF
+        
+        chmod +x security_patterns.sh
+        ./security_patterns.sh
+    
+    - name: Upload static analysis results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: static-analysis-security
+        path: security-results/
+        retention-days: 30
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install gitleaks
+      run: |
+        # Install gitleaks for secrets detection
+        wget https://github.com/zricethezav/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz
+        tar -xzf gitleaks_8.18.0_linux_x64.tar.gz
+        sudo mv gitleaks /usr/local/bin/
+        rm gitleaks_8.18.0_linux_x64.tar.gz
+    
+    - name: Create results directory
+      run: mkdir -p security-results
+    
+    - name: Run gitleaks scan
+      run: |
+        gitleaks detect \
+          --source . \
+          --report-format json \
+          --report-path security-results/gitleaks.json \
+          --verbose
+      continue-on-error: true
+    
+    - name: Run custom secrets patterns
+      run: |
+        cat > secrets_scan.rb << 'EOF'
+        require 'json'
+        
+        # Define custom patterns for TCF Platform
+        patterns = {
+          'anthropic_api_key' => /sk-ant-[a-zA-Z0-9\-_]{95}/,
+          'openai_api_key' => /sk-[a-zA-Z0-9]{48}/,
+          'jwt_secret' => /[a-zA-Z0-9]{32,}/,
+          'database_password' => /password[^a-zA-Z0-9]*[a-zA-Z0-9]{8,}/i,
+          'redis_password' => /redis.*password[^a-zA-Z0-9]*[a-zA-Z0-9]{8,}/i
+        }
+        
+        findings = []
+        
+        # Scan files
+        Dir.glob("**/*.{rb,yml,yaml,env,json}").each do |file|
+          next if file.include?('/.git/') || file.include?('/vendor/')
+          next if file.include?('spec/') || file.include?('test/')
+          next if file.end_with?('.env.example')
+          
+          begin
+            content = File.read(file)
+            
+            patterns.each do |name, pattern|
+              content.scan(pattern) do |match|
+                findings << {
+                  file: file,
+                  pattern: name,
+                  line: content[0..Regexp.last_match.offset(0)[0]].count("\n") + 1,
+                  match: match[0..20] + '...' # Truncate for safety
+                }
+              end
+            end
+          rescue => e
+            puts "Error scanning #{file}: #{e.message}"
+          end
+        end
+        
+        results = {
+          scan_date: Time.now.iso8601,
+          findings: findings,
+          total_files_scanned: Dir.glob("**/*.{rb,yml,yaml,env,json}").length,
+          total_findings: findings.length
+        }
+        
+        File.write('security-results/custom-secrets-scan.json', JSON.pretty_generate(results))
+        
+        if findings.any?
+          puts "🚨 Found #{findings.length} potential secrets"
+          findings.each do |finding|
+            puts "  #{finding[:file]}:#{finding[:line]} - #{finding[:pattern]}"
+          end
+        else
+          puts "✅ No secrets detected by custom scan"
+        end
+        EOF
+        
+        ruby secrets_scan.rb
+      continue-on-error: true
+    
+    - name: Upload secrets scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: secrets-scan
+        path: security-results/
+        retention-days: 30
+
+  security-report:
+    name: Security Report Generation
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, static-analysis, secrets-scan]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download all security artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: all-security-results
+    
+    - name: Generate comprehensive security report
+      run: |
+        echo "# 🛡️ TCF Platform Security Report" > security_summary.md
+        echo "" >> security_summary.md
+        echo "**Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> security_summary.md
+        echo "**Repository:** ${{ github.repository }}" >> security_summary.md
+        echo "**Commit:** ${{ github.sha }}" >> security_summary.md
+        echo "**Branch:** ${{ github.ref_name }}" >> security_summary.md
+        echo "" >> security_summary.md
+        
+        # Initialize counters
+        TOTAL_ISSUES=0
+        CRITICAL_ISSUES=0
+        HIGH_ISSUES=0
+        MEDIUM_ISSUES=0
+        
+        # Process dependency scan results
+        echo "## 📦 Dependency Security Results" >> security_summary.md
+        echo "" >> security_summary.md
+        
+        if [ -f all-security-results/dependency-security-scan/bundler-audit.json ]; then
+          VULN_COUNT=$(jq '.results | length' all-security-results/dependency-security-scan/bundler-audit.json 2>/dev/null || echo "0")
+          echo "- **Known vulnerabilities:** $VULN_COUNT" >> security_summary.md
+          TOTAL_ISSUES=$((TOTAL_ISSUES + VULN_COUNT))
+          
+          if [ "$VULN_COUNT" -gt 0 ]; then
+            echo "- 🚨 **Action Required:** Update vulnerable dependencies" >> security_summary.md
+            HIGH_ISSUES=$((HIGH_ISSUES + VULN_COUNT))
+          else
+            echo "- ✅ No known vulnerabilities in dependencies" >> security_summary.md
+          fi
+        else
+          echo "- ❓ Dependency scan results not available" >> security_summary.md
+        fi
+        
+        # Check custom dependency audit
+        if [ -f all-security-results/dependency-security-scan/custom-dependency-audit.json ]; then
+          CUSTOM_HIGH=$(jq '.summary.high_severity' all-security-results/dependency-security-scan/custom-dependency-audit.json 2>/dev/null || echo "0")
+          CUSTOM_MEDIUM=$(jq '.summary.medium_severity' all-security-results/dependency-security-scan/custom-dependency-audit.json 2>/dev/null || echo "0")
+          echo "- **Custom scan - High severity:** $CUSTOM_HIGH" >> security_summary.md
+          echo "- **Custom scan - Medium severity:** $CUSTOM_MEDIUM" >> security_summary.md
+          
+          HIGH_ISSUES=$((HIGH_ISSUES + CUSTOM_HIGH))
+          MEDIUM_ISSUES=$((MEDIUM_ISSUES + CUSTOM_MEDIUM))
+          TOTAL_ISSUES=$((TOTAL_ISSUES + CUSTOM_HIGH + CUSTOM_MEDIUM))
+        fi
+        echo "" >> security_summary.md
+        
+        # Process static analysis results
+        echo "## 🔍 Static Analysis Results" >> security_summary.md
+        echo "" >> security_summary.md
+        
+        if [ -f all-security-results/static-analysis-security/brakeman.json ]; then
+          BRAKEMAN_WARNINGS=$(jq '.warnings | length' all-security-results/static-analysis-security/brakeman.json 2>/dev/null || echo "0")
+          BRAKEMAN_HIGH=$(jq '[.warnings[] | select(.confidence == "High")] | length' all-security-results/static-analysis-security/brakeman.json 2>/dev/null || echo "0")
+          
+          echo "- **Brakeman warnings:** $BRAKEMAN_WARNINGS" >> security_summary.md
+          echo "- **High confidence warnings:** $BRAKEMAN_HIGH" >> security_summary.md
+          
+          TOTAL_ISSUES=$((TOTAL_ISSUES + BRAKEMAN_WARNINGS))
+          HIGH_ISSUES=$((HIGH_ISSUES + BRAKEMAN_HIGH))
+          
+          if [ "$BRAKEMAN_WARNINGS" -gt 0 ]; then
+            if [ "$BRAKEMAN_HIGH" -gt 0 ]; then
+              echo "- 🚨 **High priority:** Review high-confidence security warnings" >> security_summary.md
+            else
+              echo "- ⚠️ Review and address security warnings" >> security_summary.md
+            fi
+          else
+            echo "- ✅ No security issues detected by Brakeman" >> security_summary.md
+          fi
+        else
+          echo "- ❓ Brakeman results not available" >> security_summary.md
+        fi
+        echo "" >> security_summary.md
+        
+        # Process secrets scan results
+        echo "## 🔐 Secrets Detection Results" >> security_summary.md
+        echo "" >> security_summary.md
+        
+        if [ -f all-security-results/secrets-scan/gitleaks.json ]; then
+          SECRETS_COUNT=$(jq '. | length' all-security-results/secrets-scan/gitleaks.json 2>/dev/null || echo "0")
+          echo "- **Gitleaks findings:** $SECRETS_COUNT" >> security_summary.md
+          
+          if [ "$SECRETS_COUNT" -gt 0 ]; then
+            echo "- 🚨 **Critical:** Potential secrets detected in code" >> security_summary.md
+            CRITICAL_ISSUES=$((CRITICAL_ISSUES + SECRETS_COUNT))
+            TOTAL_ISSUES=$((TOTAL_ISSUES + SECRETS_COUNT))
+          else
+            echo "- ✅ No secrets detected by Gitleaks" >> security_summary.md
+          fi
+        fi
+        
+        if [ -f all-security-results/secrets-scan/custom-secrets-scan.json ]; then
+          CUSTOM_SECRETS=$(jq '.total_findings' all-security-results/secrets-scan/custom-secrets-scan.json 2>/dev/null || echo "0")
+          echo "- **Custom secrets scan:** $CUSTOM_SECRETS findings" >> security_summary.md
+          
+          if [ "$CUSTOM_SECRETS" -gt 0 ]; then
+            echo "- ⚠️ Review custom secrets scan findings" >> security_summary.md
+            MEDIUM_ISSUES=$((MEDIUM_ISSUES + CUSTOM_SECRETS))
+            TOTAL_ISSUES=$((TOTAL_ISSUES + CUSTOM_SECRETS))
+          else
+            echo "- ✅ No secrets detected by custom scan" >> security_summary.md
+          fi
+        fi
+        echo "" >> security_summary.md
+        
+        # Generate security score and recommendations
+        echo "## 📊 Security Score & Recommendations" >> security_summary.md
+        echo "" >> security_summary.md
+        echo "### Issue Summary" >> security_summary.md
+        echo "- **Critical Issues:** $CRITICAL_ISSUES" >> security_summary.md
+        echo "- **High Severity:** $HIGH_ISSUES" >> security_summary.md  
+        echo "- **Medium Severity:** $MEDIUM_ISSUES" >> security_summary.md
+        echo "- **Total Issues:** $TOTAL_ISSUES" >> security_summary.md
+        echo "" >> security_summary.md
+        
+        # Calculate security score
+        if [ "$CRITICAL_ISSUES" -gt 0 ]; then
+          echo "### 🔴 **CRITICAL - IMMEDIATE ACTION REQUIRED**" >> security_summary.md
+          echo "Critical security issues detected. Do not deploy to production." >> security_summary.md
+          SECURITY_SCORE="CRITICAL"
+        elif [ "$HIGH_ISSUES" -gt 5 ]; then
+          echo "### 🟠 **POOR - SIGNIFICANT ISSUES**" >> security_summary.md
+          echo "Multiple high-severity issues need immediate attention." >> security_summary.md
+          SECURITY_SCORE="POOR"
+        elif [ "$HIGH_ISSUES" -gt 0 ] || [ "$TOTAL_ISSUES" -gt 10 ]; then
+          echo "### 🟡 **FAIR - NEEDS ATTENTION**" >> security_summary.md
+          echo "Several security issues should be addressed before production deployment." >> security_summary.md
+          SECURITY_SCORE="FAIR"
+        elif [ "$TOTAL_ISSUES" -gt 0 ]; then
+          echo "### 🟢 **GOOD - MINOR ISSUES**" >> security_summary.md
+          echo "Low-severity issues detected. Consider addressing in next release." >> security_summary.md
+          SECURITY_SCORE="GOOD"
+        else
+          echo "### 🟢 **EXCELLENT - NO ISSUES**" >> security_summary.md
+          echo "No security issues detected. Great job!" >> security_summary.md
+          SECURITY_SCORE="EXCELLENT"
+        fi
+        echo "" >> security_summary.md
+        
+        # Add recommendations
+        echo "### 🎯 Recommended Actions" >> security_summary.md
+        echo "1. **Dependencies:** Run \`bundle update\` to get latest secure versions" >> security_summary.md
+        echo "2. **Code Review:** Address any Brakeman warnings" >> security_summary.md
+        echo "3. **Secrets:** Ensure no secrets are committed to repository" >> security_summary.md
+        echo "4. **Monitoring:** Set up security monitoring for production" >> security_summary.md
+        echo "5. **Regular Scans:** Schedule weekly security scans" >> security_summary.md
+        echo "" >> security_summary.md
+        echo "---" >> security_summary.md
+        echo "*Security report generated by TCF Platform Security Pipeline*" >> security_summary.md
+        
+        # Set environment variables for other jobs
+        echo "SECURITY_SCORE=$SECURITY_SCORE" >> $GITHUB_ENV
+        echo "TOTAL_SECURITY_ISSUES=$TOTAL_ISSUES" >> $GITHUB_ENV
+        echo "CRITICAL_SECURITY_ISSUES=$CRITICAL_ISSUES" >> $GITHUB_ENV
+    
+    - name: Upload security summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-summary-report
+        path: security_summary.md
+        retention-days: 90
+    
+    - name: Comment on PR with security results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const summary = fs.readFileSync('security_summary.md', 'utf8');
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `${summary}\n\n*Security scan completed in [workflow run #${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId})*`
+            });
+          } catch (error) {
+            console.log('Could not read or post security summary:', error);
+          }
+    
+    - name: Fail on critical security issues
+      run: |
+        echo "Security Score: $SECURITY_SCORE"
+        echo "Total Issues: $TOTAL_SECURITY_ISSUES"
+        echo "Critical Issues: $CRITICAL_SECURITY_ISSUES"
+        
+        if [ "$CRITICAL_SECURITY_ISSUES" -gt 0 ]; then
+          echo "❌ Critical security vulnerabilities found - blocking merge"
+          echo "Review the security report and fix critical issues before proceeding."
+          exit 1
+        fi
+        
+        if [ "$SECURITY_SCORE" = "CRITICAL" ]; then
+          echo "❌ Security score is CRITICAL - blocking merge"
+          exit 1
+        fi
+        
+        echo "✅ Security checks passed - no critical issues found"

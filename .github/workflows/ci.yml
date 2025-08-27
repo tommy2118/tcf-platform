@@ -1,0 +1,449 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version: ['3.2', '3.3', '3.4']
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: tcf_test
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: tcf_platform_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby ${{ matrix.ruby-version }}
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+        bundler-cache: true
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git curl
+    
+    - name: Set up test environment
+      run: |
+        cp .env.example .env
+        echo "REDIS_URL=redis://localhost:6379/0" >> .env
+        echo "DATABASE_URL=postgresql://tcf_test:password@localhost:5432/tcf_platform_test" >> .env
+        echo "RACK_ENV=test" >> .env
+        echo "TCF_LOG_LEVEL=error" >> .env
+        echo "JWT_SECRET=test-secret-key-for-ci-$(openssl rand -hex 32)" >> .env
+    
+    - name: Install dependencies
+      run: |
+        bundle install --jobs 4 --retry 3
+    
+    - name: Create tmp directory
+      run: mkdir -p tmp
+    
+    - name: Verify test database connection
+      run: |
+        bundle exec ruby -e "
+          require 'pg'
+          conn = PG.connect(host: 'localhost', port: 5432, dbname: 'tcf_platform_test', user: 'tcf_test', password: 'password')
+          puts 'Database connection successful'
+          conn.close
+        "
+      env:
+        PGPASSWORD: password
+    
+    - name: Run RSpec tests
+      run: |
+        bundle exec rspec \
+          --format progress \
+          --format RspecJunitFormatter \
+          --out tmp/rspec_results.xml \
+          --format json \
+          --out tmp/rspec_results.json
+      env:
+        RAILS_ENV: test
+        RACK_ENV: test
+        COVERAGE: true
+        DATABASE_URL: postgresql://tcf_test:password@localhost:5432/tcf_platform_test
+        REDIS_URL: redis://localhost:6379/0
+    
+    - name: Generate coverage badge
+      if: matrix.ruby-version == '3.4'
+      run: |
+        if [ -f coverage/.last_run.json ]; then
+          COVERAGE=$(ruby -rjson -e "puts JSON.parse(File.read('coverage/.last_run.json'))['result']['line']")
+          echo "COVERAGE_PERCENT=$COVERAGE" >> $GITHUB_ENV
+          
+          if (( $(echo "$COVERAGE >= 90" | bc -l) )); then
+            COLOR="brightgreen"
+          elif (( $(echo "$COVERAGE >= 85" | bc -l) )); then
+            COLOR="green"
+          elif (( $(echo "$COVERAGE >= 75" | bc -l) )); then
+            COLOR="yellow"
+          else
+            COLOR="red"
+          fi
+          
+          echo "COVERAGE_COLOR=$COLOR" >> $GITHUB_ENV
+        fi
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: rspec-results-ruby-${{ matrix.ruby-version }}
+        path: |
+          tmp/rspec_results.xml
+          tmp/rspec_results.json
+        retention-days: 7
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: matrix.ruby-version == '3.4' && always()
+      with:
+        name: coverage-reports
+        path: coverage/
+        retention-days: 30
+
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.4'
+        bundler-cache: true
+    
+    - name: Create tmp directory
+      run: mkdir -p tmp
+    
+    - name: Run RuboCop
+      run: |
+        bundle exec rubocop \
+          --format progress \
+          --format json \
+          --out tmp/rubocop_results.json \
+          --display-cop-names
+    
+    - name: Upload RuboCop results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: rubocop-results
+        path: tmp/rubocop_results.json
+        retention-days: 7
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.4'
+        bundler-cache: true
+    
+    - name: Create tmp directory
+      run: mkdir -p tmp
+    
+    - name: Run Bundler Audit
+      run: |
+        bundle exec bundle-audit check \
+          --update \
+          --format json \
+          --output tmp/bundler_audit.json
+      continue-on-error: true
+    
+    - name: Run Brakeman security scan
+      run: |
+        bundle exec brakeman \
+          --force \
+          --format json \
+          --output tmp/brakeman_results.json \
+          --no-pager \
+          --confidence-level 2
+      continue-on-error: true
+    
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-results
+        path: |
+          tmp/bundler_audit.json
+          tmp/brakeman_results.json
+        retention-days: 30
+
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      run: |
+        docker build -t tcf-platform:test .
+    
+    - name: Test Docker image startup
+      run: |
+        # Install redis-cli for verification
+        sudo apt-get update && sudo apt-get install -y redis-tools
+        
+        # Verify Redis is accessible
+        redis-cli ping
+        
+        # Start container with test environment
+        docker run --rm -d --name tcf-platform-test \
+          --network host \
+          -e RACK_ENV=production \
+          -e PORT=3000 \
+          -e REDIS_URL=redis://localhost:6379/0 \
+          -e JWT_SECRET=test-secret-key \
+          tcf-platform:test
+        
+        # Wait for container to start
+        sleep 20
+        
+        # Check container logs
+        echo "=== Container logs ==="
+        docker logs tcf-platform-test
+        echo "======================"
+        
+        # Test health endpoint with retry logic
+        for i in {1..10}; do
+          if curl -f -s http://localhost:3000/health; then
+            echo "Health check passed on attempt $i"
+            break
+          else
+            echo "Health check attempt $i failed, retrying in 5 seconds..."
+            if [ $i -eq 10 ]; then
+              echo "Health check failed after 10 attempts"
+              docker logs tcf-platform-test
+              exit 1
+            fi
+            sleep 5
+          fi
+        done
+        
+        # Test CLI functionality
+        docker exec tcf-platform-test /app/bin/tcf-platform version
+        
+        # Stop container
+        docker stop tcf-platform-test
+
+  integration-basic:
+    name: Basic Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    if: always() && (needs.test.result == 'success' && needs.lint.result == 'success')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.4'
+        bundler-cache: true
+    
+    - name: Set up integration test environment
+      run: |
+        cp .env.example .env
+        echo "RACK_ENV=test" >> .env
+        echo "TCF_LOG_LEVEL=debug" >> .env
+        echo "PORT=3000" >> .env
+    
+    - name: Install dependencies
+      run: bundle install
+    
+    - name: Start application in background
+      run: |
+        bundle exec rackup -p 3000 &
+        APP_PID=$!
+        echo "APP_PID=$APP_PID" >> $GITHUB_ENV
+        
+        # Wait for app to start
+        for i in {1..20}; do
+          if curl -f http://localhost:3000/health; then
+            echo "Application started successfully"
+            break
+          elif [ $i -eq 20 ]; then
+            echo "Application failed to start"
+            exit 1
+          else
+            echo "Waiting for application to start... ($i/20)"
+            sleep 3
+          fi
+        done
+    
+    - name: Run integration tests
+      run: |
+        # Test API endpoints
+        echo "Testing health endpoint..."
+        curl -f http://localhost:3000/health | jq '.'
+        
+        # Test CLI commands
+        echo "Testing CLI version command..."
+        ./bin/tcf-platform version
+        
+        echo "Integration tests passed!"
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        if [ -n "$APP_PID" ]; then
+          kill $APP_PID 2>/dev/null || true
+        fi
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, docker-build]
+    if: always()
+    
+    steps:
+    - name: Download test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: '*results*'
+        path: artifacts
+        merge-multiple: true
+    
+    - name: Evaluate quality gate
+      run: |
+        echo "=== Quality Gate Evaluation ==="
+        
+        # Initialize counters
+        FAILED_CHECKS=0
+        TOTAL_CHECKS=0
+        
+        # Check test results
+        echo "Checking test results..."
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+        if [ "${{ needs.test.result }}" != "success" ]; then
+          echo "❌ Tests failed"
+          FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        else
+          echo "✅ Tests passed"
+        fi
+        
+        # Check lint results
+        echo "Checking lint results..."
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+        if [ "${{ needs.lint.result }}" != "success" ]; then
+          echo "❌ Lint checks failed"
+          FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        else
+          echo "✅ Lint checks passed"
+        fi
+        
+        # Check security results
+        echo "Checking security scan results..."
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+        if [ "${{ needs.security.result }}" != "success" ]; then
+          echo "⚠️  Security scan issues detected"
+          # Don't fail on security issues in CI, just warn
+        else
+          echo "✅ Security scans passed"
+        fi
+        
+        # Check Docker build
+        echo "Checking Docker build..."
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+        if [ "${{ needs.docker-build.result }}" != "success" ]; then
+          echo "❌ Docker build failed"
+          FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        else
+          echo "✅ Docker build passed"
+        fi
+        
+        # Check coverage if available
+        if [ -f artifacts/coverage/.last_run.json ]; then
+          echo "Checking test coverage..."
+          COVERAGE=$(ruby -rjson -e "puts JSON.parse(File.read('artifacts/coverage/.last_run.json'))['result']['line']")
+          echo "Test coverage: ${COVERAGE}%"
+          
+          TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+          if (( $(echo "$COVERAGE < 85" | bc -l) )); then
+            echo "❌ Test coverage below 85% threshold"
+            FAILED_CHECKS=$((FAILED_CHECKS + 1))
+          else
+            echo "✅ Test coverage meets 85% threshold"
+          fi
+        fi
+        
+        # Generate summary
+        echo "=========================="
+        echo "Quality Gate Summary:"
+        echo "Total checks: $TOTAL_CHECKS"
+        echo "Failed checks: $FAILED_CHECKS"
+        echo "Success rate: $(( (TOTAL_CHECKS - FAILED_CHECKS) * 100 / TOTAL_CHECKS ))%"
+        
+        if [ $FAILED_CHECKS -eq 0 ]; then
+          echo "🎉 All quality checks passed!"
+          exit 0
+        else
+          echo "💥 Quality gate failed - $FAILED_CHECKS check(s) failed"
+          exit 1
+        fi
