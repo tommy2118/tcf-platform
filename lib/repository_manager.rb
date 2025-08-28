@@ -120,6 +120,18 @@ module TcfPlatform
       repositories
     end
 
+    def ensure_all_repositories
+      missing = discover_repositories.select { |_, info| !info[:exists] }
+      return true if missing.empty?
+      
+      results = clone_missing_repositories(missing.keys)
+      failed = results.select { |_, result| result[:status] == 'failed' }
+      
+      raise StandardError, "Failed to clone repositories: #{failed.keys.join(', ')}" unless failed.empty?
+      
+      true
+    end
+
     private
 
     def git_repository?(path)
