@@ -299,9 +299,8 @@ RSpec.describe TcfPlatform::CLI do
         # Mock ConfigValidator to return errors
         validator_double = double('ConfigValidator')
         allow(TcfPlatform::ConfigValidator).to receive(:new).and_return(validator_double)
-        allow(validator_double).to receive(:validate_all).and_return([
-          'Development environment variable not set: DATABASE_URL (using defaults)'
-        ])
+        error_message = 'Development environment variable not set: DATABASE_URL (using defaults)'
+        allow(validator_double).to receive(:validate_all).and_return([error_message])
         allow(validator_double).to receive(:security_scan).and_return([])
 
         # Mock ConfigManager

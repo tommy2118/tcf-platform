@@ -87,7 +87,7 @@ module TcfPlatform
 
         unless service_config[:port] == expected_port
           errors << "Invalid port configuration for #{service_name}: " \
-                     "expected #{expected_port}, got #{service_config[:port]}"
+                    "expected #{expected_port}, got #{service_config[:port]}"
         end
       rescue ConfigurationError => e
         errors << "Service configuration error for #{service_name}: #{e.message}"
