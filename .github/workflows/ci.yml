@@ -256,7 +256,6 @@ jobs:
         docker run --rm -d --name tcf-platform-test \
           --network host \
           -e RACK_ENV=production \
-          -e PORT=3000 \
           -e REDIS_URL=redis://localhost:6379/0 \
           -e JWT_SECRET=test-secret-key \
           tcf-platform:test
@@ -271,7 +270,7 @@ jobs:
         
         # Test health endpoint with retry logic
         for i in {1..10}; do
-          if curl -f -s http://localhost:3000/health; then
+          if curl -f -s http://localhost:3006/health; then
             echo "Health check passed on attempt $i"
             break
           else
