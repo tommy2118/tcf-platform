@@ -47,4 +47,45 @@ RSpec.describe TcfPlatform::DockerManager do
       expect(docker_manager.compose_file_exists?).to be_truthy
     end
   end
+
+  describe '#start_services' do
+    it 'starts specified services with dependencies' do
+      expect(docker_manager.start_services(['tcf-gateway'])).to include('redis', 'tcf-gateway')
+    end
+
+    it 'handles service dependencies correctly' do
+      result = docker_manager.start_services(['tcf-personas'])
+      expect(result).to include('postgres', 'redis', 'tcf-personas')
+    end
+
+    it 'starts all services when no specific services provided' do
+      result = docker_manager.start_services
+      expect(result.length).to be >= 6
+      expect(result).to include('tcf-gateway', 'tcf-personas', 'tcf-workflows')
+    end
+  end
+
+  describe '#stop_services' do
+    it 'stops services gracefully' do
+      expect(docker_manager.stop_services(['tcf-gateway'])).to be_truthy
+    end
+
+    it 'stops all services when no specific services provided' do
+      expect(docker_manager.stop_services).to be_truthy
+    end
+
+    it 'handles non-existent services gracefully' do
+      expect(docker_manager.stop_services(['non-existent-service'])).to be_truthy
+    end
+  end
+
+  describe '#restart_services' do
+    it 'restarts specified services' do
+      expect(docker_manager.restart_services(['tcf-gateway'])).to be_truthy
+    end
+
+    it 'restarts all services when none specified' do
+      expect(docker_manager.restart_services).to be_truthy
+    end
+  end
 end
