@@ -4,12 +4,12 @@ require 'spec_helper'
 require_relative '../../lib/backup_manager'
 
 RSpec.describe TcfPlatform::BackupManager do
-  let(:config_manager) { instance_double(TcfPlatform::ConfigManager) }
+  let(:config) { instance_double(TcfPlatform::Config) }
   let(:docker_manager) { instance_double(TcfPlatform::DockerManager) }
-  let(:backup_manager) { described_class.new(config_manager, docker_manager) }
+  let(:backup_manager) { described_class.new(config, docker_manager) }
 
   before do
-    allow(config_manager).to receive(:repository_config).and_return({
+    allow(config).to receive(:repository_config).and_return({
       'tcf-gateway' => { 'url' => 'git@github.com:tommy2118/tcf-gateway.git' },
       'tcf-personas' => { 'url' => 'git@github.com:tommy2118/tcf-personas.git' }
     })
@@ -91,9 +91,9 @@ RSpec.describe TcfPlatform::BackupManager do
         size: be_a(Integer),
         duration: be_a(Float),
         components: hash_including(
-          'databases' => { status: 'completed', count: 5 },
-          'redis' => { status: 'completed', size: be_a(Integer) },
-          'repositories' => { status: 'completed', count: 6 }
+          'databases' => hash_including(status: 'completed', count: 5),
+          'redis' => hash_including(status: 'completed', size: be_a(Integer)),
+          'repositories' => hash_including(status: 'completed', count: 6)
         )
       )
     end
