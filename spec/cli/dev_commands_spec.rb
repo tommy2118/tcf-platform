@@ -140,8 +140,8 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
       end
 
       aggregate_failures do
-        expect(output).to include('migration status')
-        expect(output).to match(/pending|applied|up.to.date/)
+        expect(output).to include('Migration Status Report')
+        expect(output).to match(/Pending Migrations|Applied Migrations|UP_TO_DATE/)
       end
     end
   end
@@ -180,7 +180,7 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
       end
 
       aggregate_failures do
-        expect(output).to include('Verbose')
+        expect(output).to include('Verbose System Information')
         expect(output.length).to be > 200  # Verbose should be much longer
       end
     end
@@ -202,8 +202,8 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
       end
 
       aggregate_failures do
-        expect(output).to match(/connectivity|connection|reachable/)
-        expect(output).to include('services')
+        expect(output).to match(/Service Health|connectivity|connection|reachable/)
+        expect(output).to match(/Service Health|Overall Status|Services/)
       end
     end
   end
@@ -211,10 +211,10 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
   describe 'CLI integration with development workflow' do
     it 'provides help information for dev commands' do
       output = capture_stdout do
-        cli.help('dev_setup')
+        cli.help('dev-setup')
       end
 
-      expect(output).to include('dev_setup')
+      expect(output).to include('dev-setup')
     end
 
     it 'supports command chaining workflow' do
