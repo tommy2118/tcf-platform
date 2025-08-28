@@ -12,7 +12,9 @@
       "Bash(bundle exec brakeman:*)",
       "Bash(git push:*)",
       "Bash(docker build:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh issue view:*)"
     ],
     "additionalDirectories": [
       "/Users/tcaruso/src/tcf-gateway"
