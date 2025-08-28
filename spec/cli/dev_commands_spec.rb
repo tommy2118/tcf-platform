@@ -29,7 +29,7 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
 
       aggregate_failures do
         expect(output).to include('Setting up TCF development environment')
-        expect(output.length).to be > 100  # Verbose should produce more output
+        expect(output.length).to be > 100 # Verbose should produce more output
       end
     end
 
@@ -168,9 +168,9 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
       end
 
       aggregate_failures do
-        expect(output).to match(/✓|✗|⚠/)  # Should have status indicators
+        expect(output).to match(/✓|✗|⚠/) # Should have status indicators
         expect(output).to include('System')
-        expect(output.lines.size).to be > 5  # Should be comprehensive
+        expect(output.lines.size).to be > 5 # Should be comprehensive
       end
     end
 
@@ -181,7 +181,7 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
 
       aggregate_failures do
         expect(output).to include('Verbose System Information')
-        expect(output.length).to be > 200  # Verbose should be much longer
+        expect(output.length).to be > 200 # Verbose should be much longer
       end
     end
 
@@ -221,7 +221,7 @@ RSpec.describe 'TcfPlatform::CLI Development Commands' do
       # Simulate a complete development workflow
       setup_output = capture_stdout { cli.dev_setup }
       test_output = capture_stdout { cli.dev_test }
-      
+
       aggregate_failures do
         expect(setup_output).to include('Setting up')
         expect(test_output).to include('Running tests')

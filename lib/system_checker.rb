@@ -15,7 +15,7 @@ module TcfPlatform
     end
 
     def docker_compose_available?
-      command_available?('docker-compose') || command_available?('docker') && docker_compose_v2_available?
+      command_available?('docker-compose') || (command_available?('docker') && docker_compose_v2_available?)
     end
 
     def git_available?
@@ -131,9 +131,10 @@ module TcfPlatform
     def check_required_ports
       ports_result = check_ports
       critical_blocked = ports_result[:blocked_ports] & [3000, 5432, 6379]
-      
+
       if critical_blocked.empty?
-        { name: 'ports', status: 'pass', message: "All critical ports available (#{ports_result[:available_ports].size} total)" }
+        { name: 'ports', status: 'pass',
+          message: "All critical ports available (#{ports_result[:available_ports].size} total)" }
       elsif critical_blocked.size < 2
         { name: 'ports', status: 'warning', message: "Some ports in use: #{critical_blocked.join(', ')}" }
       else
@@ -144,10 +145,10 @@ module TcfPlatform
     def check_disk_space
       # Check available disk space (simplified check)
       available_mb = disk_space_available
-      
-      if available_mb > 2048  # 2GB minimum
+
+      if available_mb > 2048 # 2GB minimum
         { name: 'disk_space', status: 'pass', message: "#{available_mb}MB available" }
-      elsif available_mb > 1024  # 1GB warning
+      elsif available_mb > 1024 # 1GB warning
         { name: 'disk_space', status: 'warning', message: "Low disk space: #{available_mb}MB available" }
       else
         { name: 'disk_space', status: 'fail', message: "Insufficient disk space: #{available_mb}MB available" }
@@ -157,10 +158,10 @@ module TcfPlatform
     def check_memory
       # Check available memory (simplified)
       available_mb = memory_available
-      
-      if available_mb > 4096  # 4GB recommended
+
+      if available_mb > 4096 # 4GB recommended
         { name: 'memory', status: 'pass', message: "#{available_mb}MB RAM available" }
-      elsif available_mb > 2048  # 2GB minimum
+      elsif available_mb > 2048 # 2GB minimum
         { name: 'memory', status: 'warning', message: "Limited RAM: #{available_mb}MB available" }
       else
         { name: 'memory', status: 'fail', message: "Insufficient RAM: #{available_mb}MB available" }
@@ -179,7 +180,7 @@ module TcfPlatform
       parts = lines[1].split
       return 0 if parts.size < 4
 
-      parts[3].to_i  # Available space in MB
+      parts[3].to_i # Available space in MB
     rescue StandardError
       0
     end
@@ -193,7 +194,7 @@ module TcfPlatform
         # Linux
         parse_memory_linux
       else
-        4096  # Default assumption
+        4096 # Default assumption
       end
     end
 
@@ -203,10 +204,10 @@ module TcfPlatform
       return 4096 unless status.success?
 
       # Parse vm_stat output
-      free_pages = stdout.match(/Pages free:\s+(\d+)/)&.captures&.first&.to_i || 0
-      page_size = 4096  # 4KB page size on macOS
-      
-      (free_pages * page_size) / 1024 / 1024  # Convert to MB
+      free_pages = stdout.match(/Pages free:\s+(\d+)/)&.captures&.first.to_i
+      page_size = 4096 # 4KB page size on macOS
+
+      (free_pages * page_size) / 1024 / 1024 # Convert to MB
     rescue StandardError
       4096
     end
@@ -216,9 +217,9 @@ module TcfPlatform
       return 4096 unless File.exist?('/proc/meminfo')
 
       meminfo = File.read('/proc/meminfo')
-      available = meminfo.match(/MemAvailable:\s+(\d+) kB/)&.captures&.first&.to_i || 0
-      
-      available / 1024  # Convert KB to MB
+      available = meminfo.match(/MemAvailable:\s+(\d+) kB/)&.captures&.first.to_i
+
+      available / 1024 # Convert KB to MB
     rescue StandardError
       4096
     end

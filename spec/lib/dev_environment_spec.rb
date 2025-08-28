@@ -10,12 +10,12 @@ RSpec.describe TcfPlatform::DevEnvironment do
   describe '#setup' do
     it 'validates system prerequisites before setup' do
       expect(dev_environment).to respond_to(:setup)
-      
+
       result = dev_environment.setup
-      
+
       aggregate_failures do
         expect(result).to be_a(Hash)
-        expect(['success', 'error']).to include(result[:status])
+        expect(%w[success error]).to include(result[:status])
         expect(result[:steps_completed]).to be_an(Array)
         expect([true, false]).to include(result[:prerequisites_validated])
       end
@@ -23,7 +23,7 @@ RSpec.describe TcfPlatform::DevEnvironment do
 
     it 'sets up development environment with all required services' do
       result = dev_environment.setup
-      
+
       # If prerequisites aren't met, we'll get different results
       if result[:status] == 'success'
         aggregate_failures do
@@ -44,9 +44,9 @@ RSpec.describe TcfPlatform::DevEnvironment do
 
     it 'handles setup failures gracefully' do
       allow_any_instance_of(TcfPlatform::SystemChecker).to receive(:docker_available?).and_return(false)
-      
+
       result = dev_environment.setup
-      
+
       aggregate_failures do
         expect(result[:status]).to eq('error')
         expect(result[:error]).to include('Docker')
@@ -58,9 +58,9 @@ RSpec.describe TcfPlatform::DevEnvironment do
   describe '#validate' do
     it 'validates all development environment components' do
       expect(dev_environment).to respond_to(:validate)
-      
+
       result = dev_environment.validate
-      
+
       aggregate_failures do
         expect(result).to be_a(Hash)
         expect(result).to have_key(:valid)
@@ -71,9 +71,9 @@ RSpec.describe TcfPlatform::DevEnvironment do
 
     it 'performs comprehensive system validation checks' do
       result = dev_environment.validate
-      
+
       expected_checks = %w[docker repositories database redis services]
-      
+
       aggregate_failures do
         check_names = result[:checks].map { |check| check[:name] }
         expected_checks.each do |check_name|
@@ -84,7 +84,7 @@ RSpec.describe TcfPlatform::DevEnvironment do
 
     it 'reports validation status for each component' do
       result = dev_environment.validate
-      
+
       result[:checks].each do |check|
         aggregate_failures do
           expect(check).to have_key(:name)
@@ -99,9 +99,9 @@ RSpec.describe TcfPlatform::DevEnvironment do
   describe '#status' do
     it 'returns current development environment status' do
       expect(dev_environment).to respond_to(:status)
-      
+
       result = dev_environment.status
-      
+
       aggregate_failures do
         expect(result).to be_a(Hash)
         expect(result).to have_key(:environment_ready)
@@ -132,9 +132,9 @@ RSpec.describe TcfPlatform::SystemChecker do
   describe '#prerequisites_met?' do
     it 'validates all system prerequisites' do
       expect(system_checker).to respond_to(:prerequisites_met?)
-      
+
       result = system_checker.prerequisites_met?
-      
+
       aggregate_failures do
         expect(result).to be_a(Hash)
         expect(result).to have_key(:met)
@@ -147,10 +147,10 @@ RSpec.describe TcfPlatform::SystemChecker do
   describe '#check_ports' do
     it 'verifies required ports are available' do
       expect(system_checker).to respond_to(:check_ports)
-      
+
       ports = [3000, 3001, 3002, 3003, 3004, 3005]
       result = system_checker.check_ports(ports)
-      
+
       aggregate_failures do
         expect(result).to be_a(Hash)
         expect(result).to have_key(:available)

@@ -22,13 +22,15 @@ module TcfPlatform
 
     def setup
       puts 'Setting up TCF development environment...'
-      
+
       # Validate prerequisites first
       prereq_result = @system_checker.prerequisites_met?
       unless prereq_result[:met]
         return {
           status: 'error',
-          error: "Prerequisites not met: #{prereq_result[:checks].reject { |c| c[:status] == 'pass' }.map { |c| c[:message] }.join(', ')}",
+          error: "Prerequisites not met: #{prereq_result[:checks].reject do |c|
+            c[:status] == 'pass'
+          end.map { |c| c[:message] }.join(', ')}",
           prerequisites_validated: false,
           steps_completed: [],
           environment_ready: false
@@ -36,7 +38,7 @@ module TcfPlatform
       end
 
       steps_completed = []
-      
+
       # Step 1: Docker availability check
       if @system_checker.docker_available?
         steps_completed << 'docker_check'
@@ -85,7 +87,7 @@ module TcfPlatform
 
     def validate
       puts 'Validating development environment...'
-      
+
       checks = []
       all_valid = true
 
@@ -138,9 +140,7 @@ module TcfPlatform
     def setup_service_configurations
       # Ensure docker-compose.yml exists or generate it
       compose_file = File.join(Dir.pwd, 'docker-compose.yml')
-      unless File.exist?(compose_file)
-        puts 'Docker Compose file not found, this is expected in development'
-      end
+      puts 'Docker Compose file not found, this is expected in development' unless File.exist?(compose_file)
 
       # Validate environment variables
       @config_manager.validate!
@@ -160,8 +160,8 @@ module TcfPlatform
       # Check if we can access repository configurations
       repo_config = @config_manager.repository_config
       missing_repos = []
-      
-      repo_config.each do |repo_name, config|
+
+      repo_config.each_key do |repo_name|
         repo_path = File.join('..', repo_name)
         missing_repos << repo_name unless File.directory?(repo_path)
       end
@@ -176,7 +176,7 @@ module TcfPlatform
     def validate_database
       # For development, we check if database URL is configured
       db_url = @config_manager.database_url
-      if db_url && db_url.include?('postgresql')
+      if db_url&.include?('postgresql')
         { name: 'database', status: 'pass', message: 'Database configuration valid' }
       else
         { name: 'database', status: 'warning', message: 'Database configuration missing or invalid' }
@@ -185,7 +185,7 @@ module TcfPlatform
 
     def validate_redis
       redis_url = @config_manager.redis_url
-      if redis_url && redis_url.include?('redis')
+      if redis_url&.include?('redis')
         { name: 'redis', status: 'pass', message: 'Redis configuration valid' }
       else
         { name: 'redis', status: 'warning', message: 'Redis configuration missing or invalid' }

@@ -27,15 +27,15 @@ module TcfPlatform
 
     def migrate_all_databases
       puts 'Starting database migrations for all TCF services...'
-      
+
       migration_results = []
       dependency_order = MIGRATION_ORDER.select { |service| @service_databases.key?(service) }
-      
+
       dependency_order.each do |service|
         puts "Migrating database for #{service}..."
         result = migrate_service(service)
         migration_results << result
-        
+
         # Stop if a critical migration fails
         if result[:status] == 'failed' && critical_service?(service)
           puts "Critical service #{service} migration failed, stopping migration process"
@@ -50,7 +50,9 @@ module TcfPlatform
         status: overall_status,
         dependency_order: dependency_order,
         migration_sequence: migration_results,
-        services_migrated: migration_results.map { |r| { service: r[:service], status: r[:status], migrations_applied: r[:migrations_applied] } },
+        services_migrated: migration_results.map do |r|
+          { service: r[:service], status: r[:status], migrations_applied: r[:migrations_applied] }
+        end,
         total_migrations_applied: total_migrations,
         timestamp: Time.now
       }
@@ -71,10 +73,10 @@ module TcfPlatform
 
       database_config = @service_databases[service_name]
       database_url = database_config[:url]
-      
+
       connectivity_check = check_database_connectivity(database_url)
       database_exists = connectivity_check && check_database_exists(database_url)
-      
+
       unless connectivity_check
         return {
           service: service_name,
@@ -89,7 +91,7 @@ module TcfPlatform
 
       # Execute migrations for the service
       migration_result = execute_service_migrations(service_name, database_url)
-      
+
       {
         service: service_name,
         status: migration_result[:success] ? 'success' : 'failed',
@@ -104,7 +106,7 @@ module TcfPlatform
 
     def rollback_migrations(service_name, options = {})
       steps = options.fetch(:steps, 1)
-      
+
       unless @service_databases.key?(service_name)
         return {
           service: service_name,
@@ -116,12 +118,12 @@ module TcfPlatform
         }
       end
 
-      database_config = @service_databases[service_name]
+      @service_databases[service_name]
       service_path = File.join('..', service_name)
-      
+
       safety_check = validate_rollback_safety(service_name, steps)
       available_rollbacks = get_available_rollbacks(service_name)
-      
+
       unless safety_check
         return {
           service: service_name,
@@ -149,7 +151,7 @@ module TcfPlatform
 
     def migration_status
       service_statuses = {}
-      
+
       @service_databases.each do |service_name, database_config|
         service_statuses[service_name] = get_service_migration_status(service_name, database_config)
       end
@@ -169,11 +171,11 @@ module TcfPlatform
 
     def build_service_database_map
       service_map = {}
-      
+
       @config_manager.repository_config.each_key do |service_name|
         # Skip gateway as it doesn't have its own database typically
         next if service_name == 'tcf-gateway'
-        
+
         database_url = get_service_database_url(service_name)
         next unless database_url
 
@@ -193,7 +195,7 @@ module TcfPlatform
       # Generate service-specific database URL
       db_name = case service_name
                 when 'tcf-personas' then 'tcf_personas'
-                when 'tcf-workflows' then 'tcf_workflows' 
+                when 'tcf-workflows' then 'tcf_workflows'
                 when 'tcf-projects' then 'tcf_projects'
                 when 'tcf-context' then 'tcf_context'
                 when 'tcf-tokens' then 'tcf_tokens'
@@ -223,9 +225,9 @@ module TcfPlatform
       check_database_connectivity(database_url)
     end
 
-    def execute_service_migrations(service_name, database_url)
+    def execute_service_migrations(service_name, _database_url)
       service_path = File.join('..', service_name)
-      
+
       unless File.directory?(service_path)
         return {
           success: false,
@@ -236,7 +238,7 @@ module TcfPlatform
       end
 
       # Try different migration approaches
-      result = try_rails_migrations(service_path) || 
+      result = try_rails_migrations(service_path) ||
                try_sequel_migrations(service_path) ||
                try_generic_migrations(service_path)
 
@@ -250,12 +252,12 @@ module TcfPlatform
 
     def try_rails_migrations(service_path)
       return nil unless File.exist?(File.join(service_path, 'Rakefile'))
-      
+
       Dir.chdir(service_path) do
         # Check if it's a Rails app with database migrations
         if File.exist?('config/database.yml') || Dir.exist?('db/migrate')
           stdout, stderr, status = Open3.capture3('bundle exec rake db:migrate')
-          
+
           {
             success: status.success?,
             migrations_applied: count_migrations_from_output(stdout),
@@ -282,7 +284,7 @@ module TcfPlatform
         # Look for sequel migration setup
         if File.exist?('Rakefile')
           stdout, stderr, status = Open3.capture3('bundle exec rake db:migrate')
-          
+
           {
             success: status.success?,
             migrations_applied: count_migrations_from_directory(File.join(service_path, 'db', 'migrations')),
@@ -314,15 +316,15 @@ module TcfPlatform
         Dir.exist?(dir) ? Dir.glob(File.join(dir, '*.sql')) + Dir.glob(File.join(dir, '*.rb')) : []
       end
 
-      if migration_files.any?
-        {
-          success: true,
-          migrations_applied: migration_files.size,
-          output: "Found #{migration_files.size} migration files",
-          error: nil,
-          migration_type: 'generic'
-        }
-      end
+      return unless migration_files.any?
+
+      {
+        success: true,
+        migrations_applied: migration_files.size,
+        output: "Found #{migration_files.size} migration files",
+        error: nil,
+        migration_type: 'generic'
+      }
     end
 
     def count_migrations_from_output(output)
@@ -334,7 +336,7 @@ module TcfPlatform
 
     def count_migrations_from_directory(migration_dir)
       return 0 unless Dir.exist?(migration_dir)
-      
+
       Dir.glob(File.join(migration_dir, '*')).size
     end
 
@@ -364,7 +366,7 @@ module TcfPlatform
         # Try Rails rollback first
         if File.exist?('Rakefile') && (File.exist?('config/database.yml') || Dir.exist?('db/migrate'))
           stdout, stderr, status = Open3.capture3("bundle exec rake db:rollback STEP=#{steps}")
-          
+
           {
             success: status.success?,
             output: stdout,
@@ -392,7 +394,7 @@ module TcfPlatform
 
     def get_service_migration_status(service_name, database_config)
       service_path = File.join('..', service_name)
-      
+
       # Get migration files
       pending_migrations = get_pending_migrations(service_name, service_path)
       applied_migrations = get_applied_migrations(service_name, service_path)
@@ -407,17 +409,17 @@ module TcfPlatform
       }
     end
 
-    def get_pending_migrations(service_name, service_path)
+    def get_pending_migrations(_service_name, service_path)
       return [] unless File.directory?(service_path)
-      
+
       # Simplified - in reality we'd query the database
       migration_files = find_migration_files(service_path)
-      migration_files.sample(rand(0..2))  # Simulate some pending migrations
+      migration_files.sample(rand(0..2)) # Simulate some pending migrations
     end
 
     def get_applied_migrations(service_name, service_path)
       return [] unless File.directory?(service_path)
-      
+
       migration_files = find_migration_files(service_path)
       applied_count = migration_files.size - get_pending_migrations(service_name, service_path).size
       migration_files.first(applied_count)
@@ -439,14 +441,14 @@ module TcfPlatform
       return 'rails' if File.exist?(File.join(service_path, 'config', 'database.yml'))
       return 'sequel' if Dir.exist?(File.join(service_path, 'db', 'migrations'))
       return 'custom' if Dir.exist?(File.join(service_path, 'migrations'))
-      
+
       'none'
     end
 
     def mask_database_credentials(database_url)
       return database_url unless database_url&.include?('@')
-      
-      database_url.gsub(/:\/\/[^@]+@/, '://***:***@')
+
+      database_url.gsub(%r{://[^@]+@}, '://***:***@')
     end
 
     def critical_service?(service_name)
@@ -455,19 +457,19 @@ module TcfPlatform
 
     def determine_migration_status(migration_results)
       failed_results = migration_results.select { |r| r[:status] == 'failed' }
-      
+
       return 'success' if failed_results.empty?
       return 'partial' if failed_results.size < migration_results.size / 2
-      
+
       'failure'
     end
 
     def determine_overall_migration_status(service_statuses)
       services_with_pending = service_statuses.count { |_, status| !status[:pending_migrations].empty? }
-      
+
       return 'up_to_date' if services_with_pending.zero?
       return 'needs_migration' if services_with_pending < service_statuses.size / 2
-      
+
       'migration_required'
     end
   end

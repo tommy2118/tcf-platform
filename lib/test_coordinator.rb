@@ -13,7 +13,8 @@ module TcfPlatform
       { name: 'gateway_personas_integration', services: %w[tcf-gateway tcf-personas] },
       { name: 'workflows_context_integration', services: %w[tcf-workflows tcf-context] },
       { name: 'projects_tokens_integration', services: %w[tcf-projects tcf-tokens] },
-      { name: 'full_platform_integration', services: %w[tcf-gateway tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens] }
+      { name: 'full_platform_integration',
+        services: %w[tcf-gateway tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens] }
     ].freeze
 
     def initialize(config_manager)
@@ -26,7 +27,7 @@ module TcfPlatform
       parallel = options.fetch(:parallel, false)
       start_time = Time.now
 
-      puts "Running tests for all TCF services#{parallel ? ' (parallel execution)' : ''}..."
+      puts "Running tests for all TCF services#{' (parallel execution)' if parallel}..."
 
       results = if parallel
                   run_tests_parallel
@@ -35,7 +36,7 @@ module TcfPlatform
                 end
 
       execution_time = Time.now - start_time
-      
+
       aggregate_test_results(results, execution_time, parallel ? 'parallel' : 'sequential')
     end
 
@@ -52,9 +53,9 @@ module TcfPlatform
       end
 
       puts "Running tests for #{service_name}..."
-      
+
       service_path = File.join('..', service_name)
-      
+
       unless File.directory?(service_path)
         return {
           service: service_name,
@@ -71,7 +72,7 @@ module TcfPlatform
 
     def run_integration_tests(services_subset = nil)
       target_services = services_subset || @services
-      
+
       puts "Running integration tests for services: #{target_services.join(', ')}"
 
       dependency_check = validate_service_dependencies(target_services)
@@ -97,7 +98,7 @@ module TcfPlatform
 
     def test_status
       service_statuses = {}
-      
+
       @services.each do |service|
         service_statuses[service] = get_service_test_status(service)
       end
@@ -105,7 +106,7 @@ module TcfPlatform
       overall_health = determine_overall_test_health(service_statuses)
 
       {
-        last_run: @last_run_results.dig(:timestamp) || 'never',
+        last_run: @last_run_results[:timestamp] || 'never',
         service_status: service_statuses,
         overall_health: overall_health,
         total_services: @services.size,
@@ -117,12 +118,12 @@ module TcfPlatform
 
     def run_tests_parallel
       puts "Executing tests in parallel across #{@services.size} services..."
-      
+
       # Simple parallel implementation using threads
       threads = @services.map do |service|
         Thread.new { run_service_tests(service) }
       end
-      
+
       threads.map(&:value)
     end
 
@@ -135,7 +136,7 @@ module TcfPlatform
     def execute_service_tests(service_name, service_path)
       # Check if service has a test suite
       test_files = find_test_files(service_path)
-      
+
       if test_files.empty?
         return {
           service: service_name,
@@ -149,11 +150,11 @@ module TcfPlatform
       end
 
       start_time = Time.now
-      
+
       # Try different test runners
-      test_result = try_rspec_tests(service_path) || 
-                   try_minitest_tests(service_path) || 
-                   try_generic_tests(service_path)
+      test_result = try_rspec_tests(service_path) ||
+                    try_minitest_tests(service_path) ||
+                    try_generic_tests(service_path)
 
       execution_time = Time.now - start_time
 
@@ -176,12 +177,12 @@ module TcfPlatform
 
     def try_rspec_tests(service_path)
       return nil unless File.exist?(File.join(service_path, 'spec'))
-      
+
       Dir.chdir(service_path) do
         if File.exist?('Gemfile') && system('bundle check', out: File::NULL, err: File::NULL)
-          stdout, stderr, status = Open3.capture3('bundle exec rspec --format json')
+          stdout, _, status = Open3.capture3('bundle exec rspec --format json')
         else
-          stdout, stderr, status = Open3.capture3('rspec --format json')
+          stdout, _, status = Open3.capture3('rspec --format json')
         end
 
         parse_rspec_results(stdout, status.success?)
@@ -200,8 +201,8 @@ module TcfPlatform
       return nil unless File.exist?(File.join(service_path, 'test'))
 
       Dir.chdir(service_path) do
-        stdout, stderr, status = Open3.capture3('ruby -Itest -e "Dir.glob(\"test/**/*_test.rb\").each { |f| require f }"')
-        
+        stdout, _, status = Open3.capture3('ruby -Itest -e "Dir.glob(\"test/**/*_test.rb\").each { |f| require f }"')
+
         parse_minitest_results(stdout, status.success?)
       end
     rescue StandardError
@@ -211,7 +212,7 @@ module TcfPlatform
     def try_generic_tests(service_path)
       # Fallback: just check if test files exist and assume they're valid
       test_files = find_test_files(service_path)
-      
+
       {
         status: 'success',
         test_count: test_files.size,
@@ -222,33 +223,31 @@ module TcfPlatform
     end
 
     def parse_rspec_results(json_output, success)
-      begin
-        results = JSON.parse(json_output)
-        
-        {
-          status: success ? 'success' : 'failure',
-          test_count: results.dig('summary', 'example_count') || 0,
-          passed: results.dig('summary', 'example_count') || 0 - (results.dig('summary', 'failure_count') || 0),
-          failed: results.dig('summary', 'failure_count') || 0,
-          runner: 'rspec'
-        }
-      rescue JSON::ParserError
-        {
-          status: success ? 'success' : 'failure',
-          test_count: 0,
-          passed: 0,
-          failed: 0,
-          runner: 'rspec',
-          parse_error: true
-        }
-      end
+      results = JSON.parse(json_output)
+
+      {
+        status: success ? 'success' : 'failure',
+        test_count: results.dig('summary', 'example_count') || 0,
+        passed: results.dig('summary', 'example_count') || (0 - (results.dig('summary', 'failure_count') || 0)),
+        failed: results.dig('summary', 'failure_count') || 0,
+        runner: 'rspec'
+      }
+    rescue JSON::ParserError
+      {
+        status: success ? 'success' : 'failure',
+        test_count: 0,
+        passed: 0,
+        failed: 0,
+        runner: 'rspec',
+        parse_error: true
+      }
     end
 
     def parse_minitest_results(output, success)
       # Parse Minitest output for test counts
-      test_count = output.scan(/(\d+) tests/).flatten.first&.to_i || 0
-      failures = output.scan(/(\d+) failures/).flatten.first&.to_i || 0
-      
+      test_count = output.scan(/(\d+) tests/).flatten.first.to_i
+      failures = output.scan(/(\d+) failures/).flatten.first.to_i
+
       {
         status: success ? 'success' : 'failure',
         test_count: test_count,
@@ -262,17 +261,17 @@ module TcfPlatform
       total_tests = service_results.sum { |r| r[:test_count] }
       total_passed = service_results.sum { |r| r[:passed] }
       total_failed = service_results.sum { |r| r[:failed] }
-      
-      failed_services = service_results.select { |r| r[:status] == 'failure' || r[:status] == 'error' }
+
+      failed_services = service_results.select { |r| %w[failure error].include?(r[:status]) }
       successful_services = service_results.select { |r| r[:status] == 'success' }
 
       overall_status = if failed_services.empty? && !successful_services.empty?
-                        'success'
-                      elsif failed_services.size < successful_services.size
-                        'partial'
-                      else
-                        'failure'
-                      end
+                         'success'
+                       elsif failed_services.size < successful_services.size
+                         'partial'
+                       else
+                         'failure'
+                       end
 
       result = {
         status: overall_status,
@@ -294,7 +293,7 @@ module TcfPlatform
     def validate_service_dependencies(services)
       # Check if all required services are available for integration
       dependencies = @config_manager.build_dependencies
-      
+
       services.all? do |service|
         service_deps = dependencies[service] || []
         service_deps.all? { |dep| services.include?(dep) }
@@ -303,10 +302,10 @@ module TcfPlatform
 
     def run_integration_scenario(scenario)
       puts "Running integration scenario: #{scenario[:name]}"
-      
+
       # For now, we'll simulate integration test execution
       # In a real implementation, this would run actual integration test suites
-      
+
       scenario_success = scenario[:services].all? do |service|
         service_path = File.join('..', service)
         File.directory?(service_path)
@@ -316,25 +315,27 @@ module TcfPlatform
         name: scenario[:name],
         services: scenario[:services],
         status: scenario_success ? 'success' : 'failure',
-        execution_time: rand(1.0..5.0).round(2)  # Simulated execution time
+        execution_time: rand(1.0..5.0).round(2) # Simulated execution time
       }
     end
 
     def get_service_test_status(service)
       service_path = File.join('..', service)
-      
+
       {
         service_available: File.directory?(service_path),
         test_files_present: !find_test_files(service_path).empty?,
-        last_result: @last_run_results.dig(:service_results)&.find { |r| r[:service] == service }&.dig(:status) || 'unknown',
-        last_run: @last_run_results.dig(:timestamp) || 'never'
+        last_result: @last_run_results[:service_results]&.find do |r|
+          r[:service] == service
+        end&.dig(:status) || 'unknown',
+        last_run: @last_run_results[:timestamp] || 'never'
       }
     end
 
     def determine_overall_test_health(service_statuses)
       available_services = service_statuses.count { |_, status| status[:service_available] }
       passing_services = service_statuses.count { |_, status| status[:last_result] == 'success' }
-      
+
       if passing_services == available_services && available_services.positive?
         'healthy'
       elsif passing_services > available_services / 2
