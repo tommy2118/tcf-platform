@@ -26,6 +26,7 @@ module TcfPlatform
 
   def self.load_app
     require_relative '../app'
+    require_relative 'service_registry'
     require_relative 'docker_manager'
     @app = TcfPlatformApp
   end

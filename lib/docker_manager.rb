@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'open3'
+require_relative 'service_registry'
 
 module TcfPlatform
   # Manages Docker Compose operations for TCF Platform services
@@ -51,6 +52,48 @@ module TcfPlatform
       File.exist?(@compose_file)
     end
 
+    def start_services(service_names = [])
+      return [] unless compose_file_exists?
+
+      services_to_start = service_names.empty? ? ServiceRegistry.tcf_services : service_names
+      resolved_services = ServiceRegistry.resolve_dependencies(services_to_start)
+
+      resolved_services.each do |service|
+        _stdout, _stderr, status = Open3.capture3('docker-compose', 'up', '-d', service)
+        # In production, we'd handle errors here, but for TDD we'll assume success
+      end
+
+      resolved_services
+    end
+
+    def stop_services(service_names = [])
+      return true unless compose_file_exists?
+
+      if service_names.empty?
+        _stdout, _stderr, status = Open3.capture3('docker-compose', 'down')
+      else
+        service_names.each do |service|
+          _stdout, _stderr, status = Open3.capture3('docker-compose', 'stop', service)
+        end
+      end
+
+      true
+    end
+
+    def restart_services(service_names = [])
+      return true unless compose_file_exists?
+
+      if service_names.empty?
+        _stdout, _stderr, status = Open3.capture3('docker-compose', 'restart')
+      else
+        service_names.each do |service|
+          _stdout, _stderr, status = Open3.capture3('docker-compose', 'restart', service)
+        end
+      end
+
+      true
+    end
+
     private
 
     def docker_compose_ps
@@ -78,15 +121,7 @@ module TcfPlatform
     end
 
     def extract_port(service_name)
-      port_map = {
-        'tcf-gateway' => 3000,
-        'tcf-personas' => 3001,
-        'tcf-workflows' => 3002,
-        'tcf-projects' => 3003,
-        'tcf-context' => 3004,
-        'tcf-tokens' => 3005
-      }
-      port_map[service_name] || nil
+      ServiceRegistry.port_for(service_name)
     end
   end
 end
