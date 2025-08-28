@@ -2,6 +2,7 @@
 
 require 'pathname'
 require 'sinatra'
+require 'json'
 
 module TcfPlatform
   VERSION = '1.0.0'
@@ -25,6 +26,7 @@ module TcfPlatform
 
   def self.load_app
     require_relative '../app'
+    require_relative 'docker_manager'
     @app = TcfPlatformApp
   end
 end
