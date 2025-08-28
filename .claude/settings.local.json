@@ -16,7 +16,8 @@
       "Bash(git checkout:*)",
       "Bash(gh issue view:*)",
       "Bash(timeout 30s bundle exec rspec)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(git pull:*)"
     ],
     "additionalDirectories": [
       "/Users/tcaruso/src/tcf-gateway"
