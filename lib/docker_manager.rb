@@ -139,5 +139,46 @@ module TcfPlatform
     def extract_port(service_name)
       ServiceRegistry.port_for(service_name)
     end
+
+    public
+
+    def service_uptime(service_name)
+      return 'unknown' unless compose_file_exists?
+
+      stdout, _stderr, status = Open3.capture3('docker-compose', 'ps', '--format', 'json', service_name.to_s)
+      return 'unknown' unless status.success? && !stdout.strip.empty?
+
+      service_info = JSON.parse(stdout.strip)
+      service_info = [service_info] unless service_info.is_a?(Array)
+
+      service = service_info.first
+      return 'unknown' unless service
+
+      created_at = service['CreatedAt'] || service['created_at']
+      return 'unknown' unless created_at
+
+      calculate_uptime_from_created(created_at)
+    rescue JSON::ParserError, StandardError
+      'unknown'
+    end
+
+    private
+
+    def calculate_uptime_from_created(created_at_str)
+      created_at = Time.parse(created_at_str)
+      uptime_seconds = Time.now - created_at
+
+      if uptime_seconds < 60
+        "#{uptime_seconds.to_i} seconds"
+      elsif uptime_seconds < 3600
+        "#{(uptime_seconds / 60).to_i} minutes"
+      elsif uptime_seconds < 86400
+        "#{(uptime_seconds / 3600).to_i} hours"
+      else
+        "#{(uptime_seconds / 86400).to_i} days"
+      end
+    rescue StandardError
+      'unknown'
+    end
   end
 end
