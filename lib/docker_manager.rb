@@ -59,7 +59,7 @@ module TcfPlatform
       resolved_services = ServiceRegistry.resolve_dependencies(services_to_start)
 
       resolved_services.each do |service|
-        _stdout, _stderr, status = Open3.capture3('docker-compose', 'up', '-d', service)
+        _stdout, _stderr, = Open3.capture3('docker-compose', 'up', '-d', service)
         # In production, we'd handle errors here, but for TDD we'll assume success
       end
 
@@ -99,26 +99,37 @@ module TcfPlatform
     def docker_compose_ps
       return [] unless compose_file_exists?
 
-      stdout, stderr, status = Open3.capture3('docker-compose', 'ps', '--format', 'json')
-      
-      return [] unless status.success?
-      
-      return [] if stdout.strip.empty?
+      stdout = execute_docker_compose_ps
+      return [] if stdout.nil?
 
-      # Parse JSON, handling both array and individual objects
+      parse_docker_compose_output(stdout)
+    end
+
+    def execute_docker_compose_ps
+      stdout, _, status = Open3.capture3('docker-compose', 'ps', '--format', 'json')
+      return nil unless status.success?
+      return nil if stdout.strip.empty?
+
+      stdout
+    rescue StandardError
+      nil
+    end
+
+    def parse_docker_compose_output(stdout)
       parsed = JSON.parse(stdout)
       parsed = [parsed] unless parsed.is_a?(Array)
-      
-      parsed.map do |service|
-        {
-          name: service['Name'] || service['name'],
-          state: service['State'] || service['state'] || 'unknown',
-          health: service['Health'] || service['health'] || 'unknown'
-        }
-      end
-    rescue JSON::ParserError, StandardError => e
-      # In test environment or when Docker isn't available, return empty array
+
+      parsed.map { |service| normalize_service_info(service) }
+    rescue JSON::ParserError
       []
+    end
+
+    def normalize_service_info(service)
+      {
+        name: service['Name'] || service['name'],
+        state: service['State'] || service['state'] || 'unknown',
+        health: service['Health'] || service['health'] || 'unknown'
+      }
     end
 
     def tcf_service?(service_name)

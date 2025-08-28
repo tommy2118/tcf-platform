@@ -8,7 +8,7 @@ RSpec.describe TcfPlatform::CLI do
   subject(:cli) { described_class.new }
 
   # Helper method to capture stdout
-  def capture_stdout(&block)
+  def capture_stdout
     original_stdout = $stdout
     $stdout = fake = StringIO.new
     begin

@@ -11,8 +11,9 @@ RSpec.describe TcfPlatform::DockerManager do
     it 'detects running TCF services' do
       # Mock docker-compose ps to return a running tcf-gateway service
       allow(docker_manager).to receive(:docker_compose_ps).and_return([
-        { name: 'tcf-gateway', state: 'running', health: 'healthy' }
-      ])
+                                                                        { name: 'tcf-gateway', state: 'running',
+                                                                          health: 'healthy' }
+                                                                      ])
       expect(docker_manager.running_services).to include('tcf-gateway')
     end
 
@@ -26,8 +27,9 @@ RSpec.describe TcfPlatform::DockerManager do
     it 'returns detailed status for each service' do
       # Mock docker-compose ps to return service info
       allow(docker_manager).to receive(:docker_compose_ps).and_return([
-        { name: 'tcf-gateway', state: 'running', health: 'healthy' }
-      ])
+                                                                        { name: 'tcf-gateway', state: 'running',
+                                                                          health: 'healthy' }
+                                                                      ])
       status = docker_manager.service_status
       expect(status).to have_key('tcf-gateway')
       expect(status['tcf-gateway']).to include(:status, :health, :port)
