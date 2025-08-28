@@ -107,8 +107,12 @@ RSpec.describe TcfPlatform::RepositoryManager do
       before do
         allow(Dir).to receive(:exist?).and_return(true)
         allow(File).to receive(:exist?).and_return(true)
+        
+        # Set up git repository detection for all repositories
+        allow(repository_manager).to receive(:git_repository?).and_return(false)
         allow(repository_manager).to receive(:git_repository?).with("#{base_path}/tcf-gateway").and_return(true)
         allow(repository_manager).to receive(:git_repository?).with("#{base_path}/tcf-personas").and_return(false)
+        
         allow(repository_manager).to receive(:get_current_branch).and_return('master')
         allow(repository_manager).to receive(:working_directory_clean?).and_return(true)
       end

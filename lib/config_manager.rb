@@ -264,5 +264,40 @@ module TcfPlatform
         raise ConfigurationError, 'Invalid REDIS_URL: malformed URL'
       end
     end
+
+    def repository_config
+      {
+        'tcf-gateway' => {
+          'url' => 'git@github.com:tommy2118/tcf-gateway.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-personas' => {
+          'url' => 'git@github.com:tommy2118/tcf-personas.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-workflows' => {
+          'url' => 'git@github.com:tommy2118/tcf-workflows.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-projects' => {
+          'url' => 'git@github.com:tommy2118/tcf-projects.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-context' => {
+          'url' => 'git@github.com:tommy2118/tcf-context.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-tokens' => {
+          'url' => 'git@github.com:tommy2118/tcf-tokens.git',
+          'branch' => 'master',
+          'required' => true
+        }
+      }
+    end
   end
 end
