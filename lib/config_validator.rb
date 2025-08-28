@@ -46,7 +46,7 @@ module TcfPlatform
 
     def validate_file_existence
       errors = []
-      expected_files = get_expected_configuration_files
+      expected_files = expected_configuration_files
 
       expected_files.each do |file_path|
         full_path = File.join(TcfPlatform.root, file_path)
@@ -86,7 +86,8 @@ module TcfPlatform
         service_config = config_manager.service_config(service_name)
 
         unless service_config[:port] == expected_port
-          errors << "Invalid port configuration for #{service_name}: expected #{expected_port}, got #{service_config[:port]}"
+          errors << "Invalid port configuration for #{service_name}: " \
+                     "expected #{expected_port}, got #{service_config[:port]}"
         end
       rescue ConfigurationError => e
         errors << "Service configuration error for #{service_name}: #{e.message}"
@@ -129,7 +130,7 @@ module TcfPlatform
       "#{environment}_#{Time.now.to_i / 300}" # 5-minute cache
     end
 
-    def get_expected_configuration_files
+    def expected_configuration_files
       case environment
       when 'development'
         %w[docker-compose.yml .env.development docker-compose.override.yml]

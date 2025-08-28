@@ -99,12 +99,12 @@ module TcfPlatform
         findings
       end
 
-      def secure_compare(a, b)
-        return false unless a.bytesize == b.bytesize
+      def secure_compare(str_a, str_b)
+        return false unless str_a.bytesize == str_b.bytesize
 
-        l = a.unpack('C*')
+        l = str_a.unpack('C*')
         res = 0
-        b.each_byte { |byte| res |= byte ^ l.shift }
+        str_b.each_byte { |byte| res |= byte ^ l.shift }
         res.zero?
       end
 

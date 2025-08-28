@@ -84,12 +84,12 @@ module TcfPlatform
 
       def measure_performance(operation_name = 'operation')
         start_time = Time.now
-        memory_before = get_memory_usage
+        memory_before = memory_usage
 
         result = yield
 
         end_time = Time.now
-        memory_after = get_memory_usage
+        memory_after = memory_usage
 
         {
           result: result,
@@ -129,7 +129,7 @@ module TcfPlatform
         end
       end
 
-      def get_memory_usage
+      def memory_usage
         # Simple memory tracking (platform dependent)
         if defined?(GC) && GC.respond_to?(:stat)
           GC.stat(:total_allocated_bytes) || 0
