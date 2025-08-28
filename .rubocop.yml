@@ -18,14 +18,24 @@ Metrics/MethodLength:
   Exclude:
     - 'lib/cli/**/*'
     - 'lib/docker_manager.rb'  # Service status method is complex by nature
+    - 'lib/config_validator.rb'  # Complex validation logic
+    - 'lib/security_manager.rb'  # Security methods need comprehensive logic
 
 Metrics/AbcSize:
   Exclude:
     - 'lib/cli/**/*'
+    - 'lib/config_validator.rb'
+    - 'lib/security_manager.rb'
 
 Metrics/ClassLength:
   Exclude:
     - 'lib/docker_manager.rb'  # Core orchestration class is complex
+    - 'lib/config_validator.rb'  # Comprehensive validation logic
+    - 'lib/security_manager.rb'  # Extensive security functionality
+
+Metrics/ModuleLength:
+  Exclude:
+    - 'lib/cli/**/*'  # CLI command modules are inherently large
 
 Metrics/CyclomaticComplexity:
   Max: 10

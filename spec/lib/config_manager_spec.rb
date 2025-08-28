@@ -5,7 +5,7 @@ require 'tcf_platform'
 
 RSpec.describe TcfPlatform::ConfigManager do
   let(:original_env) { ENV.to_h }
-  
+
   before do
     # Clean environment for each test
     ENV.clear
@@ -25,7 +25,7 @@ RSpec.describe TcfPlatform::ConfigManager do
     context 'when loading default development configuration' do
       it 'loads development configuration by default' do
         config = described_class.load_environment
-        
+
         aggregate_failures do
           expect(config.environment).to eq('development')
           expect(config.database_url).to include('development')
@@ -36,7 +36,7 @@ RSpec.describe TcfPlatform::ConfigManager do
 
       it 'provides sensible development defaults' do
         config = described_class.load_environment
-        
+
         aggregate_failures do
           expect(config.redis_url).to eq('redis://localhost:6379/0')
           expect(config.database_url).to match(/postgresql.*development/)
@@ -51,9 +51,9 @@ RSpec.describe TcfPlatform::ConfigManager do
         ENV['DATABASE_URL'] = 'postgresql://prod:password@prod-db:5432/tcf_production'
         ENV['REDIS_URL'] = 'redis://prod-redis:6379/0'
         ENV['JWT_SECRET'] = 'super-secure-production-secret'
-        
+
         config = described_class.load_environment('production')
-        
+
         aggregate_failures do
           expect(config.environment).to eq('production')
           expect(config.database_url).to include('production')
@@ -64,7 +64,7 @@ RSpec.describe TcfPlatform::ConfigManager do
 
       it 'loads test environment configuration' do
         config = described_class.load_environment('test')
-        
+
         aggregate_failures do
           expect(config.environment).to eq('test')
           expect(config.database_url).to include('test')
@@ -78,20 +78,20 @@ RSpec.describe TcfPlatform::ConfigManager do
         # Deliberately missing required variables
         ENV.delete('DATABASE_URL')
         ENV.delete('JWT_SECRET')
-        
-        expect {
+
+        expect do
           described_class.load_environment('production')
-        }.to raise_error(TcfPlatform::ConfigurationError, /Missing required environment variables/)
+        end.to raise_error(TcfPlatform::ConfigurationError, /Missing required environment variables/)
       end
 
       it 'allows missing non-critical variables in development' do
         ENV['RACK_ENV'] = 'development'
         ENV.delete('OPENAI_API_KEY')
         ENV.delete('ANTHROPIC_API_KEY')
-        
-        expect {
+
+        expect do
           described_class.load_environment('development')
-        }.not_to raise_error
+        end.not_to raise_error
       end
 
       it 'provides helpful error messages for missing required variables' do
@@ -99,10 +99,10 @@ RSpec.describe TcfPlatform::ConfigManager do
         ENV.delete('DATABASE_URL')
         ENV.delete('JWT_SECRET')
         ENV.delete('REDIS_URL')
-        
-        expect {
+
+        expect do
           described_class.load_environment('production')
-        }.to raise_error(TcfPlatform::ConfigurationError) do |error|
+        end.to raise_error(TcfPlatform::ConfigurationError) do |error|
           aggregate_failures do
             expect(error.message).to include('DATABASE_URL')
             expect(error.message).to include('JWT_SECRET')
@@ -133,7 +133,7 @@ RSpec.describe TcfPlatform::ConfigManager do
     context 'when getting gateway service configuration' do
       it 'returns service-specific configuration for tcf-gateway' do
         gateway_config = config.service_config('tcf-gateway')
-        
+
         aggregate_failures do
           expect(gateway_config).to be_a(Hash)
           expect(gateway_config[:port]).to eq(3000)
@@ -145,7 +145,7 @@ RSpec.describe TcfPlatform::ConfigManager do
 
       it 'includes service discovery URLs in gateway config' do
         gateway_config = config.service_config('tcf-gateway')
-        
+
         aggregate_failures do
           expect(gateway_config[:environment]).to include('TCF_PERSONAS_URL')
           expect(gateway_config[:environment]).to include('TCF_WORKFLOWS_URL')
@@ -159,7 +159,7 @@ RSpec.describe TcfPlatform::ConfigManager do
     context 'when getting microservice configurations' do
       it 'returns service-specific configuration for tcf-personas' do
         personas_config = config.service_config('tcf-personas')
-        
+
         aggregate_failures do
           expect(personas_config[:port]).to eq(3001)
           expect(personas_config[:environment]).to include('DATABASE_URL')
@@ -171,7 +171,7 @@ RSpec.describe TcfPlatform::ConfigManager do
 
       it 'returns service-specific configuration for tcf-workflows' do
         workflows_config = config.service_config('tcf-workflows')
-        
+
         aggregate_failures do
           expect(workflows_config[:port]).to eq(3002)
           expect(workflows_config[:environment]['DATABASE_URL']).to include('tcf_workflows')
@@ -181,7 +181,7 @@ RSpec.describe TcfPlatform::ConfigManager do
 
       it 'returns service-specific configuration for tcf-context' do
         context_config = config.service_config('tcf-context')
-        
+
         aggregate_failures do
           expect(context_config[:port]).to eq(3004)
           expect(context_config[:environment]).to include('QDRANT_URL')
@@ -192,15 +192,15 @@ RSpec.describe TcfPlatform::ConfigManager do
 
     context 'when handling unknown services' do
       it 'raises error for unknown service' do
-        expect {
+        expect do
           config.service_config('unknown-service')
-        }.to raise_error(TcfPlatform::ConfigurationError, /Unknown service: unknown-service/)
+        end.to raise_error(TcfPlatform::ConfigurationError, /Unknown service: unknown-service/)
       end
 
       it 'provides list of available services in error message' do
-        expect {
+        expect do
           config.service_config('invalid')
-        }.to raise_error(TcfPlatform::ConfigurationError, /Available services:/)
+        end.to raise_error(TcfPlatform::ConfigurationError, /Available services:/)
       end
     end
   end
@@ -210,7 +210,7 @@ RSpec.describe TcfPlatform::ConfigManager do
 
     it 'generates docker-compose environment configuration' do
       docker_config = config.docker_compose_config
-      
+
       aggregate_failures do
         expect(docker_config).to be_a(Hash)
         expect(docker_config).to have_key('services')
@@ -222,7 +222,7 @@ RSpec.describe TcfPlatform::ConfigManager do
     it 'includes proper service networking configuration' do
       docker_config = config.docker_compose_config
       gateway_service = docker_config['services']['tcf-gateway']
-      
+
       aggregate_failures do
         expect(gateway_service).to have_key('environment')
         expect(gateway_service).to have_key('depends_on')
@@ -232,11 +232,11 @@ RSpec.describe TcfPlatform::ConfigManager do
 
     it 'configures service-specific database URLs' do
       docker_config = config.docker_compose_config
-      
+
       aggregate_failures do
         personas_env = docker_config['services']['tcf-personas']['environment']
         workflows_env = docker_config['services']['tcf-workflows']['environment']
-        
+
         expect(personas_env['DATABASE_URL']).to include('tcf_personas')
         expect(workflows_env['DATABASE_URL']).to include('tcf_workflows')
       end
@@ -255,21 +255,21 @@ RSpec.describe TcfPlatform::ConfigManager do
       it 'raises error for missing required production variables' do
         ENV['RACK_ENV'] = 'production'
         ENV.delete('DATABASE_URL')
-        
+
         config = described_class.load_environment('production')
         expect { config.validate! }.to raise_error(TcfPlatform::ConfigurationError)
       end
 
       it 'raises error for invalid database URLs' do
         ENV['DATABASE_URL'] = 'invalid-url'
-        
+
         config = described_class.load_environment
         expect { config.validate! }.to raise_error(TcfPlatform::ConfigurationError, /Invalid DATABASE_URL/)
       end
 
       it 'raises error for invalid Redis URLs' do
         ENV['REDIS_URL'] = 'invalid-redis-url'
-        
+
         config = described_class.load_environment
         expect { config.validate! }.to raise_error(TcfPlatform::ConfigurationError, /Invalid REDIS_URL/)
       end
@@ -280,10 +280,10 @@ RSpec.describe TcfPlatform::ConfigManager do
     it 'reloads configuration from environment' do
       config = described_class.load_environment
       original_secret = config.jwt_secret
-      
+
       ENV['JWT_SECRET'] = 'new-secret-value'
       config.reload!
-      
+
       expect(config.jwt_secret).to eq('new-secret-value')
       expect(config.jwt_secret).not_to eq(original_secret)
     end

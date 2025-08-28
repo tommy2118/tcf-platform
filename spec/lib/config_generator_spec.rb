@@ -12,7 +12,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when initialized with valid environment' do
       it 'creates generator for development environment' do
         generator = described_class.new('development')
-        
+
         aggregate_failures do
           expect(generator.environment).to eq('development')
           expect(generator).to respond_to(:generate_compose_file)
@@ -22,7 +22,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'creates generator for production environment' do
         generator = described_class.new('production')
-        
+
         aggregate_failures do
           expect(generator.environment).to eq('production')
           expect(generator.template_path).to be_present
@@ -31,22 +31,22 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'creates generator for test environment' do
         generator = described_class.new('test')
-        
+
         expect(generator.environment).to eq('test')
       end
     end
 
     context 'when initialized with invalid environment' do
       it 'raises error for unsupported environment' do
-        expect {
+        expect do
           described_class.new('invalid_env')
-        }.to raise_error(TcfPlatform::ConfigurationError, /Unsupported environment: invalid_env/)
+        end.to raise_error(TcfPlatform::ConfigurationError, /Unsupported environment: invalid_env/)
       end
 
       it 'raises error for nil environment' do
-        expect {
+        expect do
           described_class.new(nil)
-        }.to raise_error(TcfPlatform::ConfigurationError, /Environment cannot be nil/)
+        end.to raise_error(TcfPlatform::ConfigurationError, /Environment cannot be nil/)
       end
     end
   end
@@ -55,7 +55,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating development Docker Compose' do
       it 'generates Docker Compose with correct environment variables' do
         compose_content = development_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('RACK_ENV=development')
           expect(compose_content).to include('DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development')
@@ -65,7 +65,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes all TCF services with correct ports' do
         compose_content = development_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('tcf-gateway')
           expect(compose_content).to include('tcf-personas')
@@ -80,7 +80,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes all service dependencies correctly' do
         compose_content = development_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('depends_on:')
           expect(compose_content).to include('redis')
@@ -91,7 +91,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'configures service discovery URLs for gateway' do
         compose_content = development_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('TCF_PERSONAS_URL=http://personas:3001')
           expect(compose_content).to include('TCF_WORKFLOWS_URL=http://workflows:3002')
@@ -102,7 +102,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes development-specific volume mounts' do
         compose_content = development_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('volumes:')
           expect(compose_content).to include('~/.claude:/root/.claude:ro')
@@ -114,7 +114,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating production Docker Compose' do
       it 'generates production Docker Compose with security settings' do
         compose_content = production_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('RACK_ENV=production')
           expect(compose_content).to include('restart: always')
@@ -125,7 +125,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'uses production database URLs with environment variables' do
         compose_content = production_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('DATABASE_URL=${POSTGRES_URL}')
           expect(compose_content).to include('REDIS_URL=${REDIS_URL}')
@@ -135,7 +135,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes resource limits for production services' do
         compose_content = production_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('resources:')
           expect(compose_content).to include('limits:')
@@ -146,7 +146,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'configures production monitoring services' do
         compose_content = production_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('prometheus:')
           expect(compose_content).to include('grafana:')
@@ -158,7 +158,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating test Docker Compose' do
       it 'generates test environment with isolated databases' do
         compose_content = test_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to include('RACK_ENV=test')
           expect(compose_content).to include('tcf_test')
@@ -168,7 +168,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'excludes production-only services in test mode' do
         compose_content = test_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to_not include('prometheus:')
           expect(compose_content).to_not include('grafana:')
@@ -180,7 +180,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when handling template variables' do
       it 'substitutes all template variables correctly' do
         compose_content = development_generator.generate_compose_file
-        
+
         aggregate_failures do
           expect(compose_content).to_not include('{{')
           expect(compose_content).to_not include('}}')
@@ -190,10 +190,10 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'raises error for missing required template variables' do
         allow(development_generator).to receive(:template_variables).and_return({})
-        
-        expect {
+
+        expect do
           development_generator.generate_compose_file
-        }.to raise_error(TcfPlatform::ConfigurationError, /Missing template variables/)
+        end.to raise_error(TcfPlatform::ConfigurationError, /Missing template variables/)
       end
     end
   end
@@ -202,7 +202,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating development .env file' do
       it 'creates environment-specific .env file' do
         env_content = development_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('POSTGRES_PASSWORD=development_password')
           expect(env_content).to include('REDIS_PASSWORD=development_redis_password')
@@ -212,7 +212,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes development API key placeholders' do
         env_content = development_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('OPENAI_API_KEY=your-openai-key-here')
           expect(env_content).to include('ANTHROPIC_API_KEY=your-anthropic-key-here')
@@ -222,7 +222,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'does not include any real secrets' do
         env_content = development_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to_not include('sk-')
           expect(env_content).to_not include('prod-')
@@ -234,7 +234,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating production .env file' do
       it 'creates production .env template with placeholders' do
         env_content = production_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('POSTGRES_PASSWORD=${SECURE_POSTGRES_PASSWORD}')
           expect(env_content).to include('JWT_SECRET=${SECURE_JWT_SECRET}')
@@ -244,7 +244,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes security warnings for production secrets' do
         env_content = production_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('# SECURITY WARNING')
           expect(env_content).to include('# Replace all placeholders with actual values')
@@ -254,7 +254,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes production database configuration' do
         env_content = production_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('POSTGRES_HOST=${DB_HOST}')
           expect(env_content).to include('POSTGRES_PORT=5432')
@@ -266,7 +266,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating test .env file' do
       it 'creates test-specific environment variables' do
         env_content = test_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('POSTGRES_PASSWORD=test_password')
           expect(env_content).to include('ENVIRONMENT=test')
@@ -276,7 +276,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes test-safe dummy values' do
         env_content = test_generator.generate_env_file
-        
+
         aggregate_failures do
           expect(env_content).to include('OPENAI_API_KEY=test-key-openai')
           expect(env_content).to include('ANTHROPIC_API_KEY=test-key-anthropic')
@@ -290,7 +290,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating nginx configuration for production' do
       it 'creates nginx reverse proxy configuration' do
         nginx_config = production_generator.generate_nginx_config
-        
+
         aggregate_failures do
           expect(nginx_config).to include('upstream tcf-gateway')
           expect(nginx_config).to include('server 127.0.0.1:3000')
@@ -300,7 +300,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes SSL configuration for production' do
         nginx_config = production_generator.generate_nginx_config
-        
+
         aggregate_failures do
           expect(nginx_config).to include('ssl_certificate')
           expect(nginx_config).to include('ssl_certificate_key')
@@ -310,7 +310,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'configures security headers' do
         nginx_config = production_generator.generate_nginx_config
-        
+
         aggregate_failures do
           expect(nginx_config).to include('add_header X-Frame-Options DENY')
           expect(nginx_config).to include('add_header X-Content-Type-Options nosniff')
@@ -322,7 +322,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating nginx configuration for development' do
       it 'creates simple proxy configuration without SSL' do
         nginx_config = development_generator.generate_nginx_config
-        
+
         aggregate_failures do
           expect(nginx_config).to include('listen 80')
           expect(nginx_config).to_not include('ssl_certificate')
@@ -336,7 +336,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     context 'when generating Kubernetes manifests for production' do
       it 'creates deployment manifests for all services' do
         k8s_manifests = production_generator.generate_k8s_manifests
-        
+
         aggregate_failures do
           expect(k8s_manifests).to include('apiVersion: apps/v1')
           expect(k8s_manifests).to include('kind: Deployment')
@@ -347,7 +347,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'creates service manifests for inter-service communication' do
         k8s_manifests = production_generator.generate_k8s_manifests
-        
+
         aggregate_failures do
           expect(k8s_manifests).to include('kind: Service')
           expect(k8s_manifests).to include('port: 3000')
@@ -357,7 +357,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
       it 'includes persistent volume claims for data' do
         k8s_manifests = production_generator.generate_k8s_manifests
-        
+
         aggregate_failures do
           expect(k8s_manifests).to include('kind: PersistentVolumeClaim')
           expect(k8s_manifests).to include('storage: 10Gi')
@@ -370,7 +370,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
   describe '#template_variables' do
     it 'provides environment-specific template variables' do
       variables = development_generator.template_variables
-      
+
       aggregate_failures do
         expect(variables).to be_a(Hash)
         expect(variables).to have_key(:environment)
@@ -381,7 +381,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
     it 'includes service URLs in template variables' do
       variables = development_generator.template_variables
-      
+
       aggregate_failures do
         expect(variables).to have_key(:gateway_url)
         expect(variables).to have_key(:personas_url)
@@ -391,7 +391,7 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
     it 'masks secrets in production template variables' do
       variables = production_generator.template_variables
-      
+
       aggregate_failures do
         expect(variables[:database_password]).to include('${')
         expect(variables[:jwt_secret]).to include('${')
@@ -402,40 +402,38 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
   describe '#validate_templates' do
     it 'validates all template files exist' do
-      expect {
+      expect do
         development_generator.validate_templates
-      }.not_to raise_error
+      end.not_to raise_error
     end
 
     it 'raises error for missing template files' do
       allow(File).to receive(:exist?).and_return(false)
-      
-      expect {
+
+      expect do
         development_generator.validate_templates
-      }.to raise_error(TcfPlatform::ConfigurationError, /Template file not found/)
+      end.to raise_error(TcfPlatform::ConfigurationError, /Template file not found/)
     end
 
     it 'validates template syntax is correct' do
       # Mock File.read to return valid content for existence check but ERB.new to fail
       allow(File).to receive(:exist?).and_return(true)
       allow(File).to receive(:read).and_return('valid template content')
-      
+
       # Mock ERB.new to raise an exception on the first call
       original_erb_new = ERB.method(:new)
       call_count = 0
-      
+
       allow(ERB).to receive(:new) do |content|
         call_count += 1
-        if call_count == 1
-          raise StandardError, "Template syntax error"
-        else
-          original_erb_new.call(content)
-        end
+        raise StandardError, 'Template syntax error' if call_count == 1
+
+        original_erb_new.call(content)
       end
-      
-      expect {
-        development_generator.validate_templates  
-      }.to raise_error(TcfPlatform::ConfigurationError, /Invalid template syntax/)
+
+      expect do
+        development_generator.validate_templates
+      end.to raise_error(TcfPlatform::ConfigurationError, /Invalid template syntax/)
     end
   end
 
@@ -443,16 +441,16 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     let(:output_dir) { '/tmp/tcf-test-configs' }
 
     before do
-      FileUtils.rm_rf(output_dir) if Dir.exist?(output_dir)
+      FileUtils.rm_rf(output_dir)
     end
 
     after do
-      FileUtils.rm_rf(output_dir) if Dir.exist?(output_dir)
+      FileUtils.rm_rf(output_dir)
     end
 
     it 'writes all configuration files to specified directory' do
       development_generator.write_configs(output_dir)
-      
+
       aggregate_failures do
         expect(File.exist?(File.join(output_dir, 'docker-compose.yml'))).to be true
         expect(File.exist?(File.join(output_dir, '.env'))).to be true
@@ -462,9 +460,9 @@ RSpec.describe TcfPlatform::ConfigGenerator do
 
     it 'creates directory if it does not exist' do
       expect(Dir.exist?(output_dir)).to be false
-      
+
       development_generator.write_configs(output_dir)
-      
+
       expect(Dir.exist?(output_dir)).to be true
     end
 
@@ -472,9 +470,9 @@ RSpec.describe TcfPlatform::ConfigGenerator do
       # Create existing file
       FileUtils.mkdir_p(output_dir)
       File.write(File.join(output_dir, 'docker-compose.yml'), 'old content')
-      
+
       development_generator.write_configs(output_dir, force: true)
-      
+
       content = File.read(File.join(output_dir, 'docker-compose.yml'))
       expect(content).to_not eq('old content')
     end
@@ -489,10 +487,10 @@ RSpec.describe TcfPlatform::ConfigGenerator do
         /AKIA[0-9A-Z]{16}/, # AWS Access Keys
         /[a-f0-9]{64}/ # Generic 64-char hex secrets
       ]
-      
+
       secret_patterns.any? { |pattern| actual.match?(pattern) }
     end
-    
+
     failure_message do |actual|
       "expected #{actual} to not contain any real secrets"
     end
@@ -501,20 +499,20 @@ RSpec.describe TcfPlatform::ConfigGenerator do
   RSpec::Matchers.define :include_any_real_secrets do
     match do |hash|
       return false unless hash.is_a?(Hash)
-      
+
       hash.values.any? do |value|
         next false unless value.is_a?(String)
-        
+
         # Check for real API key patterns
         value.match?(/sk-[a-zA-Z0-9]{48}/) || # OpenAI
-        value.match?(/sk-ant-[a-zA-Z0-9\-_]{95}/) || # Anthropic  
-        value.match?(/AKIA[0-9A-Z]{16}/) || # AWS
-        value.match?(/[a-f0-9]{64}/) # Generic secrets
+          value.match?(/sk-ant-[a-zA-Z0-9\-_]{95}/) || # Anthropic
+          value.match?(/AKIA[0-9A-Z]{16}/) || # AWS
+          value.match?(/[a-f0-9]{64}/) # Generic secrets
       end
     end
-    
-    failure_message do |actual|
-      "expected template variables to not contain any real secrets, but found some"
+
+    failure_message do |_actual|
+      'expected template variables to not contain any real secrets, but found some'
     end
   end
 end

@@ -9,7 +9,7 @@ module TcfPlatform
 
   class ConfigManager
     REQUIRED_PRODUCTION_VARS = %w[DATABASE_URL JWT_SECRET REDIS_URL].freeze
-    
+
     SERVICE_PORTS = {
       'tcf-gateway' => 3000,
       'tcf-personas' => 3001,
@@ -58,18 +58,16 @@ module TcfPlatform
       end
 
       port = ConfigManager::SERVICE_PORTS[service_name]
-      config = {
+      {
         port: port,
         environment: build_service_environment(service_name)
       }
-
-      config
     end
 
     def docker_compose_config
       services = {}
-      
-      ConfigManager::SERVICE_PORTS.each do |service_name, port|
+
+      ConfigManager::SERVICE_PORTS.each_key do |service_name|
         services[service_name] = {
           'environment' => build_service_environment(service_name),
           'depends_on' => build_service_dependencies(service_name)
@@ -97,9 +95,9 @@ module TcfPlatform
       end
 
       # Validate if multiple required variables are missing
-      if missing_vars.length >= 2
-        raise ConfigurationError, "Missing required environment variables: #{missing_vars.join(', ')}"
-      end
+      return unless missing_vars.length >= 2
+
+      raise ConfigurationError, "Missing required environment variables: #{missing_vars.join(', ')}"
     end
 
     def validate_critical_production_vars!
@@ -110,9 +108,9 @@ module TcfPlatform
       # Only raise during construction if we're missing ALL required variables
       # This handles the case where production environment is completely unconfigured
       # Partial misconfigurations are caught by validate!
-      if missing_vars.length == ConfigManager::REQUIRED_PRODUCTION_VARS.length
-        raise ConfigurationError, "Missing required environment variables: #{missing_vars.join(', ')}"
-      end
+      return unless missing_vars.length == ConfigManager::REQUIRED_PRODUCTION_VARS.length
+
+      raise ConfigurationError, "Missing required environment variables: #{missing_vars.join(', ')}"
     end
 
     def validate_required_production_vars_comprehensive!
@@ -120,20 +118,20 @@ module TcfPlatform
         ENV[var].nil? || ENV[var].empty?
       end
 
-      unless missing_vars.empty?
-        raise ConfigurationError, "Missing required environment variables: #{missing_vars.join(', ')}"
-      end
+      return if missing_vars.empty?
+
+      raise ConfigurationError, "Missing required environment variables: #{missing_vars.join(', ')}"
     end
 
     def load_config
       config = {}
-      
+
       # Load from environment variables
-      config['database_url'] = ENV['DATABASE_URL']
-      config['redis_url'] = ENV['REDIS_URL']
-      config['jwt_secret'] = ENV['JWT_SECRET']
-      config['openai_api_key'] = ENV['OPENAI_API_KEY']
-      config['anthropic_api_key'] = ENV['ANTHROPIC_API_KEY']
+      config['database_url'] = ENV.fetch('DATABASE_URL', nil)
+      config['redis_url'] = ENV.fetch('REDIS_URL', nil)
+      config['jwt_secret'] = ENV.fetch('JWT_SECRET', nil)
+      config['openai_api_key'] = ENV.fetch('OPENAI_API_KEY', nil)
+      config['anthropic_api_key'] = ENV.fetch('ANTHROPIC_API_KEY', nil)
       config['qdrant_url'] = ENV['QDRANT_URL'] || 'http://localhost:6333'
 
       # Remove nil values
@@ -153,7 +151,7 @@ module TcfPlatform
 
     def build_service_environment(service_name)
       env = {}
-      
+
       # Common environment variables
       env['JWT_SECRET'] = jwt_secret
       env['REDIS_URL'] = service_redis_url(service_name)
@@ -230,14 +228,14 @@ module TcfPlatform
 
     def build_service_dependencies(service_name)
       deps = ['redis']
-      
+
       case service_name
       when 'tcf-gateway'
-        deps.concat(%w[personas workflows projects context tokens])
+        deps.push('personas', 'workflows', 'projects', 'context', 'tokens')
       when 'tcf-personas', 'tcf-workflows', 'tcf-projects', 'tcf-tokens'
         deps << 'postgres'
       when 'tcf-context'
-        deps.concat(%w[postgres qdrant])
+        deps.push('postgres', 'qdrant')
       end
 
       deps
@@ -249,9 +247,9 @@ module TcfPlatform
 
       begin
         uri = URI.parse(url)
-        raise ConfigurationError, "Invalid DATABASE_URL: must use postgresql scheme" unless uri.scheme == 'postgresql'
+        raise ConfigurationError, 'Invalid DATABASE_URL: must use postgresql scheme' unless uri.scheme == 'postgresql'
       rescue URI::InvalidURIError
-        raise ConfigurationError, "Invalid DATABASE_URL: malformed URL"
+        raise ConfigurationError, 'Invalid DATABASE_URL: malformed URL'
       end
     end
 
@@ -261,9 +259,9 @@ module TcfPlatform
 
       begin
         uri = URI.parse(url)
-        raise ConfigurationError, "Invalid REDIS_URL: must use redis scheme" unless uri.scheme == 'redis'
+        raise ConfigurationError, 'Invalid REDIS_URL: must use redis scheme' unless uri.scheme == 'redis'
       rescue URI::InvalidURIError
-        raise ConfigurationError, "Invalid REDIS_URL: malformed URL"
+        raise ConfigurationError, 'Invalid REDIS_URL: malformed URL'
       end
     end
   end
