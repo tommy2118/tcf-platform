@@ -27,13 +27,9 @@ module TcfPlatform
         backup_date = backup[:created_at].to_date
         date_in_range = true
 
-        if from
-          date_in_range &&= backup_date >= from
-        end
+        date_in_range &&= backup_date >= from if from
 
-        if to
-          date_in_range &&= backup_date <= to
-        end
+        date_in_range &&= backup_date <= to if to
 
         date_in_range
       end
@@ -82,13 +78,13 @@ module TcfPlatform
 
       # Determine final status
       failed_components = result[:components_restored].select { |_, data| data[:status] == 'failed' }
-      if failed_components.empty?
-        result[:status] = 'completed'
-      elsif failed_components.size == result[:components_restored].size
-        result[:status] = 'failed'
-      else
-        result[:status] = 'partial'
-      end
+      result[:status] = if failed_components.empty?
+                          'completed'
+                        elsif failed_components.size == result[:components_restored].size
+                          'failed'
+                        else
+                          'partial'
+                        end
 
       result[:duration] = Time.now - start_time
       result
@@ -132,24 +128,23 @@ module TcfPlatform
     def load_backup_metadata(backup_id)
       backups = @backup_manager.list_backups
       backup = backups.find { |b| b[:backup_id] == backup_id }
-      
+
       raise StandardError, "Backup #{backup_id} not found" unless backup
 
       backup
     end
 
-    def validate_backup_integrity(backup_id)
+    def validate_backup_integrity(_backup_id)
       # Simplified validation - in real implementation would verify checksums
       { valid: true, errors: [] }
     end
 
     def create_recovery_point
       timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
-      recovery_point_id = "recovery_point_#{timestamp}"
+      "recovery_point_#{timestamp}"
 
       # In real implementation, would create actual backup before restoration
       # For now, just return the recovery point ID
-      recovery_point_id
     end
 
     def restore_component(component, backup_id)
@@ -169,13 +164,13 @@ module TcfPlatform
       end
     end
 
-    def restore_databases(backup_id)
+    def restore_databases(_backup_id)
       start_time = Time.now
-      
+
       # In real implementation, would restore actual databases
       # Simulate restoration process
       sleep(0.001) # Simulate work
-      
+
       {
         status: 'restored',
         count: 5,
@@ -183,36 +178,36 @@ module TcfPlatform
       }
     end
 
-    def restore_redis(backup_id)
+    def restore_redis(_backup_id)
       start_time = Time.now
-      
+
       # In real implementation, would restore Redis data
       sleep(0.001) # Simulate work
-      
+
       {
         status: 'restored',
         duration: Time.now - start_time
       }
     end
 
-    def restore_qdrant(backup_id)
+    def restore_qdrant(_backup_id)
       start_time = Time.now
-      
+
       # In real implementation, would restore Qdrant collections
       sleep(0.001) # Simulate work
-      
+
       {
         status: 'restored',
         duration: Time.now - start_time
       }
     end
 
-    def restore_repositories(backup_id)
+    def restore_repositories(_backup_id)
       start_time = Time.now
-      
+
       # In real implementation, would restore Git repositories
       sleep(0.001) # Simulate work
-      
+
       {
         status: 'restored',
         count: 6,
@@ -220,12 +215,12 @@ module TcfPlatform
       }
     end
 
-    def restore_configuration(backup_id)
+    def restore_configuration(_backup_id)
       start_time = Time.now
-      
+
       # In real implementation, would restore configuration files
       sleep(0.001) # Simulate work
-      
+
       {
         status: 'restored',
         duration: Time.now - start_time
@@ -253,7 +248,7 @@ module TcfPlatform
       end
     end
 
-    def validate_backup_metadata(backup_id)
+    def validate_backup_metadata(_backup_id)
       # In real implementation, would validate metadata structure and content
       {
         valid: true,

@@ -42,7 +42,7 @@ module TcfPlatform
 
       # Repository sources
       sources[:repositories] = {}
-      @config.repository_config.each do |repo_name, _config|
+      @config.repository_config.each_key do |repo_name|
         sources[:repositories][repo_name] = {
           type: 'git',
           size: calculate_repository_size(repo_name)
@@ -73,9 +73,7 @@ module TcfPlatform
         created_at: start_time
       }
 
-      if incremental
-        result[:base_backup] = find_last_backup
-      end
+      result[:base_backup] = find_last_backup if incremental
 
       backup_dir = File.join(@backup_path, backup_id)
       FileUtils.mkdir_p(backup_dir)
@@ -86,13 +84,13 @@ module TcfPlatform
 
       # Calculate final status
       failed_components = component_results.select { |_, data| data[:status] == 'failed' }
-      if failed_components.empty?
-        result[:status] = 'completed'
-      elsif failed_components.size == component_results.size
-        result[:status] = 'failed'
-      else
-        result[:status] = 'partial'
-      end
+      result[:status] = if failed_components.empty?
+                          'completed'
+                        elsif failed_components.size == component_results.size
+                          'failed'
+                        else
+                          'partial'
+                        end
 
       # Calculate total size and duration
       result[:size] = calculate_backup_size(backup_dir)
@@ -124,7 +122,7 @@ module TcfPlatform
       end.sort_by { |backup| backup[:created_at] }.reverse
     end
 
-    def calculate_database_size(db_name = nil)
+    def calculate_database_size(_db_name = nil)
       # Simplified size calculation - would use actual database queries in real implementation
       1024 * 1024 # 1MB default
     end
@@ -139,7 +137,7 @@ module TcfPlatform
       2048 * 1024 # 2MB default
     end
 
-    def calculate_repository_size(repo_name = nil)
+    def calculate_repository_size(_repo_name = nil)
       # Simplified size calculation - would check actual repository size in real implementation
       1024 * 512 # 512KB default
     end
@@ -231,7 +229,7 @@ module TcfPlatform
       FileUtils.mkdir_p(repos_dir)
 
       begin
-        @config.repository_config.each do |repo_name, _config|
+        @config.repository_config.each_key do |repo_name|
           repo_backup_file = File.join(repos_dir, "#{repo_name}.tar.gz")
           # In real implementation, would create actual git archive
           File.write(repo_backup_file, "Repository #{repo_name} backup placeholder\n")
@@ -291,11 +289,11 @@ module TcfPlatform
     def calculate_total_size(sources)
       total = 0
 
-      sources.each do |_category, data|
+      sources.each_value do |data|
         if data.is_a?(Hash) && data[:size]
           total += data[:size]
         elsif data.is_a?(Hash)
-          data.each { |_key, item| total += item[:size] if item.is_a?(Hash) && item[:size] }
+          data.each_value { |item| total += item[:size] if item.is_a?(Hash) && item[:size] }
         end
       end
 
