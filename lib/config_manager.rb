@@ -123,6 +123,17 @@ module TcfPlatform
       }
     end
 
+    def build_dependencies
+      {
+        'tcf-gateway' => %w[tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens],
+        'tcf-personas' => [],
+        'tcf-workflows' => ['tcf-personas'],
+        'tcf-projects' => ['tcf-context'],
+        'tcf-context' => [],
+        'tcf-tokens' => []
+      }
+    end
+
     private
 
     def validate_production_on_load!
@@ -299,17 +310,6 @@ module TcfPlatform
       rescue URI::InvalidURIError
         raise ConfigurationError, 'Invalid REDIS_URL: malformed URL'
       end
-    end
-
-    def build_dependencies
-      {
-        'tcf-gateway' => %w[tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens],
-        'tcf-personas' => [],
-        'tcf-workflows' => ['tcf-personas'],
-        'tcf-projects' => ['tcf-context'],
-        'tcf-context' => [],
-        'tcf-tokens' => []
-      }
     end
   end
 end

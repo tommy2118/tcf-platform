@@ -2,6 +2,7 @@
 
 require 'spec_helper'
 require_relative '../../lib/test_coordinator'
+require_relative '../../lib/migration_manager'
 
 RSpec.describe TcfPlatform::TestCoordinator do
   let(:config_manager) { TcfPlatform::ConfigManager.load_environment('test') }
@@ -131,7 +132,7 @@ RSpec.describe TcfPlatform::MigrationManager do
         expect(result).to be_a(Hash)
         expect(result).to have_key(:status)
         expect(result).to have_key(:services_migrated)
-        expect(result).to have_key(:migrations_applied)
+        expect(result).to have_key(:total_migrations_applied)
         expect(result[:services_migrated]).to be_an(Array)
       end
     end
