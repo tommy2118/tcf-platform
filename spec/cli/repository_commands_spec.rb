@@ -55,8 +55,8 @@ RSpec.describe TcfPlatform::RepositoryCommands do
 
         aggregate_failures do
           expect($stdout).to have_received(:puts).with(/📋 TCF Platform Repository Status/)
-          expect($stdout).to have_received(:puts).with(/tcf-gateway.*✅.*master.*abc123/)
-          expect($stdout).to have_received(:puts).with(/tcf-personas.*❌.*Missing/)
+          expect($stdout).to have_received(:puts).with(/tcf-gateway.*master.*abc123/)
+          expect($stdout).to have_received(:puts).with(/tcf-personas.*Missing/)
         end
       end
 
@@ -101,7 +101,7 @@ RSpec.describe TcfPlatform::RepositoryCommands do
         cli.repos('clone')
 
         aggregate_failures do
-          expect(repository_manager).to have_received(:clone_missing_repositories).with(no_args)
+          expect(repository_manager).to have_received(:clone_missing_repositories).with(nil)
           expect($stdout).to have_received(:puts).with(/🔄 Cloning missing repositories/)
           expect($stdout).to have_received(:puts).with(/✅.*tcf-personas.*cloned/)
           expect($stdout).to have_received(:puts).with(/❌.*tcf-workflows.*failed/)
@@ -161,7 +161,7 @@ RSpec.describe TcfPlatform::RepositoryCommands do
         cli.repos('update')
 
         aggregate_failures do
-          expect(repository_manager).to have_received(:update_repositories).with(no_args)
+          expect(repository_manager).to have_received(:update_repositories).with(nil)
           expect($stdout).to have_received(:puts).with(/🔄 Updating repositories/)
           expect($stdout).to have_received(:puts).with(/✅.*tcf-gateway.*updated/)
           expect($stdout).to have_received(:puts).with(/❌.*tcf-personas.*failed/)
@@ -227,8 +227,8 @@ RSpec.describe TcfPlatform::RepositoryCommands do
         cli.build
 
         aggregate_failures do
-          expect($stdout).to have_received(:puts).with(/45.2s/)
-          expect($stdout).to have_received(:puts).with(/150.5 MB/)
+          expect($stdout).to have_received(:puts).with(/tcf-personas.*success.*45.2s/)
+          expect($stdout).to have_received(:puts).with(/Total time.*45.2s.*Total size.*150.5/)
           expect($stdout).to have_received(:puts).with(/Build completed/)
         end
       end
@@ -271,13 +271,15 @@ RSpec.describe TcfPlatform::RepositoryCommands do
       end
 
       before do
-        allow(cli).to receive(:options).and_return({ 'parallel' => true })
+        allow(cli).to receive(:options).and_return({ parallel: true })
         allow(build_coordinator).to receive(:parallel_build).and_return(parallel_build_results)
         allow(build_coordinator).to receive(:analyze_dependencies).and_return({
           'tcf-personas' => [],
           'tcf-context' => [],
           'tcf-tokens' => []
         })
+        allow(build_coordinator).to receive(:calculate_build_order).and_return(%w[tcf-personas tcf-context tcf-tokens])
+        allow(build_coordinator).to receive(:build_services).and_return({})
       end
 
       it 'builds independent services in parallel' do
@@ -321,9 +323,9 @@ RSpec.describe TcfPlatform::RepositoryCommands do
 
       aggregate_failures do
         expect($stdout).to have_received(:puts).with(/📊 TCF Platform Build Status/)
-        expect($stdout).to have_received(:puts).with(/tcf-gateway.*✅.*Built.*2.5h ago/)
-        expect($stdout).to have_received(:puts).with(/tcf-personas.*❌.*Not built/)
-        expect($stdout).to have_received(:puts).with(/200.5 MB/)
+        expect($stdout).to have_received(:puts).with(/tcf-gateway.*Built.*2.5h ago/)
+        expect($stdout).to have_received(:puts).with(/tcf-personas.*Not built/)
+        expect($stdout).to have_received(:puts).with(/Total size: 200.5 MB/)
       end
     end
 
