@@ -5,6 +5,7 @@ require_relative '../tcf_platform'
 require_relative 'orchestration_commands'
 require_relative 'status_commands'
 require_relative 'config_commands'
+require_relative 'repository_commands'
 
 module TcfPlatform
   # Main CLI class for TCF Platform management
@@ -12,6 +13,7 @@ module TcfPlatform
     include OrchestrationCommands
     include StatusCommands
     include ConfigCommands
+    include RepositoryCommands
 
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
 
@@ -41,6 +43,13 @@ module TcfPlatform
         puts '  tcf-platform show              # Show current configuration'
         puts '  tcf-platform migrate           # Migrate configuration'
         puts '  tcf-platform reset             # Reset configuration'
+        puts ''
+        puts 'Repository & Build Commands:'
+        puts '  tcf-platform repos status      # Show repository status'
+        puts '  tcf-platform repos clone       # Clone missing repositories'
+        puts '  tcf-platform repos update      # Update existing repositories'
+        puts '  tcf-platform build [SERVICE]   # Build services'
+        puts '  tcf-platform build-status      # Show build status'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'

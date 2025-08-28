@@ -6,6 +6,7 @@ require 'pathname'
 
 module TcfPlatform
   class ConfigurationError < StandardError; end
+  class CircularDependencyError < StandardError; end
 
   class ConfigManager
     REQUIRED_PRODUCTION_VARS = %w[DATABASE_URL JWT_SECRET REDIS_URL].freeze
@@ -263,6 +264,52 @@ module TcfPlatform
       rescue URI::InvalidURIError
         raise ConfigurationError, 'Invalid REDIS_URL: malformed URL'
       end
+    end
+
+    def repository_config
+      {
+        'tcf-gateway' => {
+          'url' => 'git@github.com:tommy2118/tcf-gateway.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-personas' => {
+          'url' => 'git@github.com:tommy2118/tcf-personas.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-workflows' => {
+          'url' => 'git@github.com:tommy2118/tcf-workflows.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-projects' => {
+          'url' => 'git@github.com:tommy2118/tcf-projects.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-context' => {
+          'url' => 'git@github.com:tommy2118/tcf-context.git',
+          'branch' => 'master',
+          'required' => true
+        },
+        'tcf-tokens' => {
+          'url' => 'git@github.com:tommy2118/tcf-tokens.git',
+          'branch' => 'master',
+          'required' => true
+        }
+      }
+    end
+
+    def build_dependencies
+      {
+        'tcf-gateway' => %w[tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens],
+        'tcf-personas' => [],
+        'tcf-workflows' => ['tcf-personas'],
+        'tcf-projects' => ['tcf-context'],
+        'tcf-context' => [],
+        'tcf-tokens' => []
+      }
     end
   end
 end
