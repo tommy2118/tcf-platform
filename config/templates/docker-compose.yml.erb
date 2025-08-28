@@ -1,0 +1,330 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  gateway:
+<% if environment == 'production' %>
+    image: tcf/gateway:latest
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+<% else %>
+    build: ../tcf-gateway
+    image: tcf/gateway:latest
+<% end %>
+    container_name: tcf-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - RACK_ENV=<%= environment %>
+<% if environment == 'production' %>
+      - DATABASE_URL=${POSTGRES_URL}
+      - REDIS_URL=${REDIS_URL}
+<% elsif environment == 'test' %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_test
+      - REDIS_URL=redis://redis:6379/15
+<% else %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development
+      - REDIS_URL=redis://redis:6379/0
+<% end %>
+      - TCF_PERSONAS_URL=<%= tcf_personas_url %>
+      - TCF_WORKFLOWS_URL=<%= tcf_workflows_url %>
+      - TCF_PROJECTS_URL=<%= tcf_projects_url %>
+      - TCF_CONTEXT_URL=<%= tcf_context_url %>
+      - TCF_TOKENS_URL=<%= tcf_tokens_url %>
+    depends_on:
+      - redis
+      - personas
+      - workflows
+      - projects
+      - context
+      - tokens
+<% if environment == 'development' %>
+    volumes:
+      - ../tcf-gateway:/app
+<% end %>
+    networks:
+      - tcf-network
+
+  # Personas Service
+  personas:
+<% if environment == 'production' %>
+    image: tcf/personas:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+<% else %>
+    build: ../tcf-personas
+    image: tcf/personas:latest
+<% end %>
+    container_name: tcf-personas
+    ports:
+      - "3001:3001"
+    environment:
+      - RACK_ENV=<%= environment %>
+<% if environment == 'production' %>
+      - DATABASE_URL=${POSTGRES_URL}
+      - REDIS_URL=${REDIS_URL}
+<% elsif environment == 'test' %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_test
+      - REDIS_URL=redis://redis:6379/15
+<% else %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development
+      - REDIS_URL=redis://redis:6379/1
+<% end %>
+      - TCF_CONTEXT_URL=<%= tcf_context_url %>
+      - TCF_TOKENS_URL=<%= tcf_tokens_url %>
+      - CLAUDE_HOME=/root/.claude
+    volumes:
+<% if environment == 'development' %>
+      - ../tcf-personas:/app
+<% end %>
+      - ~/.claude:/root/.claude:ro
+      - persona-data:/app/data
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tcf-network
+
+  # Workflows Service
+  workflows:
+<% if environment == 'production' %>
+    image: tcf/workflows:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+<% else %>
+    build: ../tcf-workflows
+    image: tcf/workflows:latest
+<% end %>
+    container_name: tcf-workflows
+    ports:
+      - "3002:3002"
+    environment:
+      - RACK_ENV=<%= environment %>
+<% if environment == 'production' %>
+      - DATABASE_URL=${POSTGRES_URL}
+      - REDIS_URL=${REDIS_URL}
+<% elsif environment == 'test' %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_test
+      - REDIS_URL=redis://redis:6379/15
+<% else %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development
+      - REDIS_URL=redis://redis:6379/2
+<% end %>
+      - TCF_PERSONAS_URL=<%= tcf_personas_url %>
+      - TCF_CONTEXT_URL=<%= tcf_context_url %>
+      - TCF_TOKENS_URL=<%= tcf_tokens_url %>
+    volumes:
+<% if environment == 'development' %>
+      - ../tcf-workflows:/app
+<% end %>
+      - workflow-data:/app/data
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tcf-network
+
+  # Projects Service
+  projects:
+<% if environment == 'production' %>
+    image: tcf/projects:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+<% else %>
+    build: ../tcf-projects
+    image: tcf/projects:latest
+<% end %>
+    container_name: tcf-projects
+    ports:
+      - "3003:3003"
+    environment:
+      - RACK_ENV=<%= environment %>
+<% if environment == 'production' %>
+      - DATABASE_URL=${POSTGRES_URL}
+      - REDIS_URL=${REDIS_URL}
+<% elsif environment == 'test' %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_test
+      - REDIS_URL=redis://redis:6379/15
+<% else %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development
+      - REDIS_URL=redis://redis:6379/3
+<% end %>
+      - TCF_CONTEXT_URL=<%= tcf_context_url %>
+      - TCF_TOKENS_URL=<%= tcf_tokens_url %>
+      - S3_BUCKET=tcf-artifacts
+    volumes:
+<% if environment == 'development' %>
+      - ../tcf-projects:/app
+<% end %>
+      - project-data:/app/data
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tcf-network
+
+  # Context Service
+  context:
+<% if environment == 'production' %>
+    image: tcf/context:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+<% else %>
+    build: ../tcf-context
+    image: tcf/context:latest
+<% end %>
+    container_name: tcf-context
+    ports:
+      - "3004:3004"
+    environment:
+      - RACK_ENV=<%= environment %>
+<% if environment == 'production' %>
+      - DATABASE_URL=${POSTGRES_URL}
+      - REDIS_URL=${REDIS_URL}
+<% elsif environment == 'test' %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_test
+      - REDIS_URL=redis://redis:6379/15
+<% else %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development
+      - REDIS_URL=redis://redis:6379/4
+<% end %>
+      - QDRANT_URL=http://qdrant:6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+    networks:
+      - tcf-network
+
+  # Tokens Service
+  tokens:
+<% if environment == 'production' %>
+    image: tcf/tokens:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+<% else %>
+    build: ../tcf-tokens
+    image: tcf/tokens:latest
+<% end %>
+    container_name: tcf-tokens
+    ports:
+      - "3005:3005"
+    environment:
+      - RACK_ENV=<%= environment %>
+<% if environment == 'production' %>
+      - DATABASE_URL=${POSTGRES_URL}
+      - REDIS_URL=${REDIS_URL}
+<% elsif environment == 'test' %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_test
+      - REDIS_URL=redis://redis:6379/15
+<% else %>
+      - DATABASE_URL=postgresql://tcf:password@postgres:5432/tcf_development
+      - REDIS_URL=redis://redis:6379/5
+<% end %>
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tcf-network
+
+  # Storage Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: tcf-postgres
+    environment:
+      - POSTGRES_USER=tcf
+      - POSTGRES_PASSWORD=<%= database_password %>
+      - POSTGRES_MULTIPLE_DATABASES=tcf_personas,tcf_workflows,tcf_projects,tcf_context,tcf_tokens
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/init.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - tcf-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tcf-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - tcf-network
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: tcf-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - tcf-network
+
+<% if environment == 'production' %>
+  # Monitoring Services
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tcf-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - tcf-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tcf-grafana
+    ports:
+      - "3006:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - tcf-network
+<% end %>
+
+networks:
+  tcf-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  qdrant-data:
+  persona-data:
+  workflow-data:
+  project-data:
+<% if environment == 'production' %>
+  grafana-data:
+<% end %>

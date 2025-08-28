@@ -1,0 +1,37 @@
+# TCF Platform - Test Environment Configuration
+
+database_url: "postgresql://tcf:password@localhost:5432/tcf_platform_test"
+redis_url: "redis://localhost:6379/0"
+jwt_secret: "test-secret-key"
+
+# Service URLs
+services:
+  gateway:
+    port: 3000
+    url: "http://localhost:3000"
+  personas:
+    port: 3001
+    url: "http://localhost:3001"
+  workflows:
+    port: 3002
+    url: "http://localhost:3002"
+  projects:
+    port: 3003
+    url: "http://localhost:3003"
+  context:
+    port: 3004
+    url: "http://localhost:3004"
+  tokens:
+    port: 3005
+    url: "http://localhost:3005"
+
+# External Services
+external_services:
+  qdrant_url: "http://localhost:6333"
+  postgres_url: "postgresql://tcf:password@localhost:5432"
+  redis_url: "redis://localhost:6379"
+
+# API Keys (optional in test)
+api_keys:
+  openai_api_key: null
+  anthropic_api_key: null
