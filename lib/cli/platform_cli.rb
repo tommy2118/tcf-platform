@@ -2,6 +2,8 @@
 
 require 'thor'
 require_relative '../tcf_platform'
+require_relative '../docker_manager'
+require_relative '../service_registry'
 
 module TcfPlatform
   class CLI < Thor
@@ -22,6 +24,9 @@ module TcfPlatform
         puts '  tcf-platform version           # Display the version'
         puts '  tcf-platform server            # Start the TCF Platform server'
         puts '  tcf-platform status            # Display application status'
+        puts '  tcf-platform up [SERVICE]      # Start TCF Platform services'
+        puts '  tcf-platform down              # Stop TCF Platform services'
+        puts '  tcf-platform restart [SERVICE] # Restart TCF Platform services'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'
@@ -64,6 +69,50 @@ module TcfPlatform
 
       # Check if server is running
       check_server_status
+      puts ''
+
+      # Check Docker services
+      check_docker_services
+    end
+
+    desc 'up [SERVICE]', 'Start TCF Platform services'
+    def up(service = nil)
+      docker_manager = TcfPlatform::DockerManager.new
+
+      if service
+        service_name = normalize_service_name(service)
+        puts "Starting #{service_name}..."
+        services_started = docker_manager.start_services([service_name])
+        puts "✅ Started services: #{services_started.join(', ')}"
+      else
+        puts 'Starting TCF Platform services...'
+        services_started = docker_manager.start_services
+        puts "✅ Started #{services_started.length} services: #{services_started.join(', ')}"
+      end
+    end
+
+    desc 'down', 'Stop TCF Platform services'
+    def down
+      puts 'Stopping TCF Platform services...'
+      docker_manager = TcfPlatform::DockerManager.new
+      docker_manager.stop_services
+      puts '✅ All services stopped successfully'
+    end
+
+    desc 'restart [SERVICE]', 'Restart TCF Platform services'
+    def restart(service = nil)
+      docker_manager = TcfPlatform::DockerManager.new
+
+      if service
+        service_name = normalize_service_name(service)
+        puts "Restarting #{service_name}..."
+        docker_manager.restart_services([service_name])
+        puts "✅ Restarted #{service_name}"
+      else
+        puts 'Restarting TCF Platform services...'
+        docker_manager.restart_services
+        puts '✅ All services restarted successfully'
+      end
     end
 
     private
@@ -91,6 +140,51 @@ module TcfPlatform
         puts "Server Status: Not running on port #{port}"
       rescue StandardError => e
         puts "Server Status: Unknown (#{e.message})"
+      end
+    end
+
+    def check_docker_services
+      docker_manager = TcfPlatform::DockerManager.new
+      
+      puts 'Service Status'
+      puts '-' * 50
+      puts format('%-15s %-12s %-8s %-6s', 'Service', 'Status', 'Health', 'Port')
+      puts '-' * 50
+
+      service_status = docker_manager.service_status
+      service_status.each do |service_name, info|
+        status_icon = info[:status] == 'running' ? '🟢' : '🔴'
+        health_icon = case info[:health]
+                      when 'healthy' then '✅'
+                      when 'unhealthy' then '❌'
+                      else '❓'
+                      end
+        
+        puts format('%-15s %-12s %-8s %-6s', 
+                   service_name, 
+                   "#{status_icon} #{info[:status]}", 
+                   "#{health_icon} #{info[:health]}", 
+                   info[:port])
+      end
+    end
+
+    def normalize_service_name(service)
+      # Allow shorthand service names
+      case service.downcase
+      when 'gateway'
+        'tcf-gateway'
+      when 'personas'
+        'tcf-personas'
+      when 'workflows'
+        'tcf-workflows'
+      when 'projects'
+        'tcf-projects'
+      when 'context'
+        'tcf-context'
+      when 'tokens'
+        'tcf-tokens'
+      else
+        service
       end
     end
   end
