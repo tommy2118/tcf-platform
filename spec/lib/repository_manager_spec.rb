@@ -82,7 +82,7 @@ RSpec.describe TcfPlatform::RepositoryManager do
 
       it 'identifies missing repositories' do
         repos = repository_manager.discover_repositories
-        missing_repos = repos.select { |_, info| !info[:exists] }
+        missing_repos = repos.reject { |_, info| info[:exists] }
 
         aggregate_failures do
           expect(missing_repos).to have_key('tcf-personas')
@@ -107,12 +107,12 @@ RSpec.describe TcfPlatform::RepositoryManager do
       before do
         allow(Dir).to receive(:exist?).and_return(true)
         allow(File).to receive(:exist?).and_return(true)
-        
+
         # Set up git repository detection for all repositories
         allow(repository_manager).to receive(:git_repository?).and_return(false)
         allow(repository_manager).to receive(:git_repository?).with("#{base_path}/tcf-gateway").and_return(true)
         allow(repository_manager).to receive(:git_repository?).with("#{base_path}/tcf-personas").and_return(false)
-        
+
         allow(repository_manager).to receive(:get_current_branch).and_return('master')
         allow(repository_manager).to receive(:working_directory_clean?).and_return(true)
       end
@@ -129,7 +129,7 @@ RSpec.describe TcfPlatform::RepositoryManager do
   end
 
   describe '#clone_missing_repositories' do
-    let(:missing_repos) { ['tcf-personas', 'tcf-workflows'] }
+    let(:missing_repos) { %w[tcf-personas tcf-workflows] }
 
     context 'when cloning succeeds' do
       before do
@@ -189,10 +189,12 @@ RSpec.describe TcfPlatform::RepositoryManager do
     context 'when no repositories specified' do
       before do
         allow(repository_manager).to receive(:discover_repositories).and_return({
-          'tcf-gateway' => { exists: true },
-          'tcf-personas' => { exists: false, required: true },
-          'tcf-workflows' => { exists: false, required: false }
-        })
+                                                                                  'tcf-gateway' => { exists: true },
+                                                                                  'tcf-personas' => { exists: false,
+                                                                                                      required: true },
+                                                                                  'tcf-workflows' => { exists: false,
+                                                                                                       required: false }
+                                                                                })
         allow(repository_manager).to receive(:execute_git_clone).and_return(true)
         allow(repository_manager).to receive(:verify_clone_success).and_return(true)
       end
@@ -210,21 +212,23 @@ RSpec.describe TcfPlatform::RepositoryManager do
   end
 
   describe '#update_repositories' do
-    let(:existing_repos) { ['tcf-gateway', 'tcf-personas'] }
+    let(:existing_repos) { %w[tcf-gateway tcf-personas] }
 
     context 'when updating succeeds' do
       before do
         allow(repository_manager).to receive(:discover_repositories).and_return({
-          'tcf-gateway' => { exists: true, path: "#{base_path}/tcf-gateway" },
-          'tcf-personas' => { exists: true, path: "#{base_path}/tcf-personas" }
-        })
+                                                                                  'tcf-gateway' => { exists: true,
+                                                                                                     path: "#{base_path}/tcf-gateway" },
+                                                                                  'tcf-personas' => { exists: true,
+                                                                                                      path: "#{base_path}/tcf-personas" }
+                                                                                })
         allow(repository_manager).to receive(:execute_git_pull).and_return(true)
         allow(repository_manager).to receive(:get_latest_commit_info).and_return({
-          hash: 'abc123',
-          message: 'Latest commit',
-          author: 'Developer',
-          date: Time.now
-        })
+                                                                                   hash: 'abc123',
+                                                                                   message: 'Latest commit',
+                                                                                   author: 'Developer',
+                                                                                   date: Time.now
+                                                                                 })
       end
 
       it 'updates all existing repositories' do
@@ -255,9 +259,11 @@ RSpec.describe TcfPlatform::RepositoryManager do
     context 'when updating fails' do
       before do
         allow(repository_manager).to receive(:discover_repositories).and_return({
-          'tcf-gateway' => { exists: true, path: "#{base_path}/tcf-gateway" },
-          'tcf-personas' => { exists: true, path: "#{base_path}/tcf-personas" }
-        })
+                                                                                  'tcf-gateway' => { exists: true,
+                                                                                                     path: "#{base_path}/tcf-gateway" },
+                                                                                  'tcf-personas' => { exists: true,
+                                                                                                      path: "#{base_path}/tcf-personas" }
+                                                                                })
         allow(repository_manager).to receive(:execute_git_pull)
           .with("#{base_path}/tcf-gateway")
           .and_raise(StandardError, 'Merge conflicts')
@@ -265,8 +271,8 @@ RSpec.describe TcfPlatform::RepositoryManager do
           .with("#{base_path}/tcf-personas")
           .and_return(true)
         allow(repository_manager).to receive(:get_latest_commit_info).and_return({
-          hash: 'def456', message: 'Working commit', author: 'Developer', date: Time.now
-        })
+                                                                                   hash: 'def456', message: 'Working commit', author: 'Developer', date: Time.now
+                                                                                 })
       end
 
       it 'handles update failures gracefully' do
@@ -283,13 +289,15 @@ RSpec.describe TcfPlatform::RepositoryManager do
     context 'when specific repositories requested' do
       before do
         allow(repository_manager).to receive(:discover_repositories).and_return({
-          'tcf-gateway' => { exists: true, path: "#{base_path}/tcf-gateway" },
-          'tcf-personas' => { exists: true, path: "#{base_path}/tcf-personas" }
-        })
+                                                                                  'tcf-gateway' => { exists: true,
+                                                                                                     path: "#{base_path}/tcf-gateway" },
+                                                                                  'tcf-personas' => { exists: true,
+                                                                                                      path: "#{base_path}/tcf-personas" }
+                                                                                })
         allow(repository_manager).to receive(:execute_git_pull).and_return(true)
         allow(repository_manager).to receive(:get_latest_commit_info).and_return({
-          hash: 'ghi789', message: 'Specific update', author: 'Developer', date: Time.now
-        })
+                                                                                   hash: 'ghi789', message: 'Specific update', author: 'Developer', date: Time.now
+                                                                                 })
       end
 
       it 'updates only specified repositories' do
@@ -307,27 +315,27 @@ RSpec.describe TcfPlatform::RepositoryManager do
   describe '#repository_status' do
     before do
       allow(repository_manager).to receive(:discover_repositories).and_return({
-        'tcf-gateway' => {
-          exists: true,
-          path: "#{base_path}/tcf-gateway",
-          git_repository: true,
-          current_branch: 'master',
-          clean: true
-        },
-        'tcf-personas' => {
-          exists: true,
-          path: "#{base_path}/tcf-personas",
-          git_repository: true,
-          current_branch: 'feature/new-feature',
-          clean: false
-        }
-      })
+                                                                                'tcf-gateway' => {
+                                                                                  exists: true,
+                                                                                  path: "#{base_path}/tcf-gateway",
+                                                                                  git_repository: true,
+                                                                                  current_branch: 'master',
+                                                                                  clean: true
+                                                                                },
+                                                                                'tcf-personas' => {
+                                                                                  exists: true,
+                                                                                  path: "#{base_path}/tcf-personas",
+                                                                                  git_repository: true,
+                                                                                  current_branch: 'feature/new-feature',
+                                                                                  clean: false
+                                                                                }
+                                                                              })
       allow(repository_manager).to receive(:get_latest_commit_info).and_return({
-        hash: 'commit123',
-        message: 'Latest changes',
-        author: 'Dev Team',
-        date: Time.now - 3600
-      })
+                                                                                 hash: 'commit123',
+                                                                                 message: 'Latest changes',
+                                                                                 author: 'Dev Team',
+                                                                                 date: Time.now - 3600
+                                                                               })
     end
 
     it 'provides comprehensive repository status information' do

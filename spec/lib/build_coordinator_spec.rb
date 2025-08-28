@@ -11,7 +11,7 @@ RSpec.describe TcfPlatform::BuildCoordinator do
 
   let(:build_dependencies) do
     {
-      'tcf-gateway' => ['tcf-personas', 'tcf-workflows', 'tcf-projects', 'tcf-context', 'tcf-tokens'],
+      'tcf-gateway' => %w[tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens],
       'tcf-personas' => [],
       'tcf-workflows' => ['tcf-personas'],
       'tcf-projects' => ['tcf-context'],
@@ -42,7 +42,7 @@ RSpec.describe TcfPlatform::BuildCoordinator do
 
       aggregate_failures do
         expect(dependencies).to include(
-          'tcf-gateway' => ['tcf-personas', 'tcf-workflows', 'tcf-projects', 'tcf-context', 'tcf-tokens'],
+          'tcf-gateway' => %w[tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens],
           'tcf-personas' => [],
           'tcf-workflows' => ['tcf-personas']
         )
@@ -74,17 +74,15 @@ RSpec.describe TcfPlatform::BuildCoordinator do
       end
 
       it 'detects circular dependencies and raises error' do
-        expect {
+        expect do
           build_coordinator.analyze_dependencies
-        }.to raise_error(TcfPlatform::CircularDependencyError, /Circular dependency detected/)
+        end.to raise_error(TcfPlatform::CircularDependencyError, /Circular dependency detected/)
       end
 
       it 'provides details about the circular dependency' do
-        begin
-          build_coordinator.analyze_dependencies
-        rescue TcfPlatform::CircularDependencyError => e
-          expect(e.message).to include('service-a', 'service-b', 'service-c')
-        end
+        build_coordinator.analyze_dependencies
+      rescue TcfPlatform::CircularDependencyError => e
+        expect(e.message).to include('service-a', 'service-b', 'service-c')
       end
     end
   end
@@ -123,7 +121,7 @@ RSpec.describe TcfPlatform::BuildCoordinator do
 
     context 'when specific services requested' do
       it 'calculates build order for requested services only' do
-        build_order = build_coordinator.calculate_build_order(['tcf-workflows', 'tcf-personas'])
+        build_order = build_coordinator.calculate_build_order(%w[tcf-workflows tcf-personas])
 
         aggregate_failures do
           expect(build_order).to contain_exactly('tcf-personas', 'tcf-workflows')
@@ -143,17 +141,18 @@ RSpec.describe TcfPlatform::BuildCoordinator do
   end
 
   describe '#build_services' do
-    let(:services_to_build) { ['tcf-personas', 'tcf-gateway'] }
+    let(:services_to_build) { %w[tcf-personas tcf-gateway] }
 
     context 'when building succeeds' do
       before do
-        allow(build_coordinator).to receive(:calculate_build_order).and_return(['tcf-personas', 'tcf-workflows', 'tcf-projects', 'tcf-context', 'tcf-tokens', 'tcf-gateway'])
+        allow(build_coordinator).to receive(:calculate_build_order).and_return(%w[tcf-personas tcf-workflows
+                                                                                  tcf-projects tcf-context tcf-tokens tcf-gateway])
         allow(build_coordinator).to receive(:build_single_service).and_return({
-          status: 'success',
-          image_id: 'sha256:abc123',
-          build_time: 45.2,
-          size_mb: 150.5
-        })
+                                                                                status: 'success',
+                                                                                image_id: 'sha256:abc123',
+                                                                                build_time: 45.2,
+                                                                                size_mb: 150.5
+                                                                              })
       end
 
       it 'builds services in dependency order' do
@@ -193,19 +192,30 @@ RSpec.describe TcfPlatform::BuildCoordinator do
     end
 
     context 'when some builds fail' do
+      let(:modified_build_dependencies) do
+        {
+          'tcf-gateway' => %w[tcf-personas tcf-workflows tcf-projects tcf-context tcf-tokens],
+          'tcf-personas' => [],
+          'tcf-workflows' => [], # Make workflows independent for this test
+          'tcf-projects' => ['tcf-context'],
+          'tcf-context' => [],
+          'tcf-tokens' => []
+        }
+      end
+
       before do
-        allow(build_coordinator).to receive(:calculate_build_order).and_return(['tcf-personas', 'tcf-workflows', 'tcf-gateway'])
+        allow(config_manager).to receive(:build_dependencies).and_return(modified_build_dependencies)
+        allow(build_coordinator).to receive(:calculate_build_order).and_return(%w[tcf-personas tcf-workflows
+                                                                                  tcf-gateway])
         allow(build_coordinator).to receive(:build_single_service) do |service_name|
-          if service_name == 'tcf-personas'
-            raise StandardError, 'Build failed: Missing dependency'
-          else
-            { status: 'success', image_id: "sha256:#{service_name}", build_time: 30.0, size_mb: 100.0 }
-          end
+          raise StandardError, 'Build failed: Missing dependency' if service_name == 'tcf-personas'
+
+          { status: 'success', image_id: "sha256:#{service_name}", build_time: 30.0, size_mb: 100.0 }
         end
       end
 
       it 'handles build failures and continues with independent services' do
-        result = build_coordinator.build_services(['tcf-personas', 'tcf-workflows'])
+        result = build_coordinator.build_services(%w[tcf-personas tcf-workflows])
 
         aggregate_failures do
           expect(result['tcf-personas'][:status]).to eq('failed')
@@ -215,7 +225,7 @@ RSpec.describe TcfPlatform::BuildCoordinator do
       end
 
       it 'skips services that depend on failed builds' do
-        result = build_coordinator.build_services(['tcf-personas', 'tcf-workflows', 'tcf-gateway'])
+        result = build_coordinator.build_services(%w[tcf-personas tcf-workflows tcf-gateway])
 
         aggregate_failures do
           expect(result['tcf-personas'][:status]).to eq('failed')
@@ -247,7 +257,7 @@ RSpec.describe TcfPlatform::BuildCoordinator do
   end
 
   describe '#parallel_build' do
-    let(:independent_services) { ['tcf-personas', 'tcf-context', 'tcf-tokens'] }
+    let(:independent_services) { %w[tcf-personas tcf-context tcf-tokens] }
 
     context 'when parallel building succeeds' do
       before do
@@ -299,11 +309,9 @@ RSpec.describe TcfPlatform::BuildCoordinator do
     context 'when some parallel builds fail' do
       before do
         allow(build_coordinator).to receive(:build_single_service) do |service_name|
-          if service_name == 'tcf-context'
-            raise StandardError, 'Parallel build failure'
-          else
-            { status: 'success', image_id: "sha256:#{service_name}", build_time: 0.1, size_mb: 100.0 }
-          end
+          raise StandardError, 'Parallel build failure' if service_name == 'tcf-context'
+
+          { status: 'success', image_id: "sha256:#{service_name}", build_time: 0.1, size_mb: 100.0 }
         end
       end
 
@@ -321,18 +329,18 @@ RSpec.describe TcfPlatform::BuildCoordinator do
 
   describe '#build_status' do
     before do
-      allow(build_coordinator).to receive(:get_docker_images).and_return({
-        'tcf-gateway' => {
-          image_id: 'sha256:gateway123',
-          created: Time.now - 3600,
-          size_mb: 200.5
-        },
-        'tcf-personas' => {
-          image_id: 'sha256:personas456',
-          created: Time.now - 7200,
-          size_mb: 150.2
-        }
-      })
+      allow(build_coordinator).to receive(:docker_images).and_return({
+                                                                           'tcf-gateway' => {
+                                                                             image_id: 'sha256:gateway123',
+                                                                             created: Time.now - 3600,
+                                                                             size_mb: 200.5
+                                                                           },
+                                                                           'tcf-personas' => {
+                                                                             image_id: 'sha256:personas456',
+                                                                             created: Time.now - 7200,
+                                                                             size_mb: 150.2
+                                                                           }
+                                                                         })
     end
 
     it 'provides comprehensive build status for all services' do
@@ -349,9 +357,11 @@ RSpec.describe TcfPlatform::BuildCoordinator do
     end
 
     it 'identifies services without built images' do
-      allow(build_coordinator).to receive(:get_docker_images).and_return({
-        'tcf-gateway' => { image_id: 'sha256:gateway123', created: Time.now, size_mb: 200.5 }
-      })
+      allow(build_coordinator).to receive(:docker_images).and_return({
+                                                                           'tcf-gateway' => {
+                                                                             image_id: 'sha256:gateway123', created: Time.now, size_mb: 200.5
+                                                                           }
+                                                                         })
 
       status = build_coordinator.build_status
 
