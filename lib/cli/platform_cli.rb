@@ -6,6 +6,7 @@ require_relative 'orchestration_commands'
 require_relative 'status_commands'
 require_relative 'config_commands'
 require_relative 'repository_commands'
+require_relative 'dev_commands'
 
 module TcfPlatform
   # Main CLI class for TCF Platform management
@@ -14,8 +15,40 @@ module TcfPlatform
     include StatusCommands
     include ConfigCommands
     include RepositoryCommands
+    include DevCommands
 
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
+
+    # Development Commands
+    desc 'dev-setup', 'Set up complete TCF development environment'
+    option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
+    option :force, type: :boolean, default: false, desc: 'Force setup even if environment appears ready'
+    def dev_setup
+      setup_development_environment
+    end
+
+    desc 'dev-test [SERVICE]', 'Run tests across TCF services'
+    option :parallel, type: :boolean, default: false, desc: 'Run tests in parallel'
+    option :integration, type: :boolean, default: false, desc: 'Run integration tests'
+    option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
+    def dev_test(service = nil)
+      run_development_tests(service)
+    end
+
+    desc 'dev-migrate [SERVICE]', 'Manage database migrations across TCF services'
+    option :rollback, type: :numeric, desc: 'Rollback N migration steps'
+    option :status, type: :boolean, default: false, desc: 'Show migration status'
+    option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
+    def dev_migrate(service = nil)
+      manage_database_migrations(service)
+    end
+
+    desc 'dev-doctor', 'Comprehensive TCF development environment diagnostics'
+    option :verbose, type: :boolean, default: false, desc: 'Enable verbose diagnostics'
+    option :quick, type: :boolean, default: false, desc: 'Quick health check only'
+    def dev_doctor
+      run_environment_diagnostics
+    end
 
     desc 'version', 'Display the version'
     def version
@@ -50,6 +83,12 @@ module TcfPlatform
         puts '  tcf-platform repos update      # Update existing repositories'
         puts '  tcf-platform build [SERVICE]   # Build services'
         puts '  tcf-platform build-status      # Show build status'
+        puts ''
+        puts 'Development Commands:'
+        puts '  tcf-platform dev-setup          # Set up development environment'
+        puts '  tcf-platform dev-test [SERVICE] # Run tests (--parallel, --integration)'
+        puts '  tcf-platform dev-migrate [SVC]  # Database migrations (--status, --rollback N)'
+        puts '  tcf-platform dev-doctor         # Environment diagnostics (--quick, --verbose)'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'
