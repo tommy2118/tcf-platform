@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative '../spec_helper'
 require 'stringio'
 
@@ -7,7 +9,7 @@ RSpec.describe TcfPlatform::CLI do
   describe '#help' do
     it 'displays available commands' do
       output = capture_stdout { cli.help }
-      
+
       aggregate_failures do
         expect(output).to include('tcf-platform commands:')
         expect(output).to include('help')
@@ -26,40 +28,40 @@ RSpec.describe TcfPlatform::CLI do
   end
 
   describe '#server' do
-    it 'displays server start message with default port' do
+    before do
       allow(cli).to receive(:exec)
-      
+    end
+
+    it 'displays server start message with default port' do
       output = capture_stdout { cli.server }
-      
+
       aggregate_failures do
         expect(output).to include('Starting TCF Platform server')
-        expect(output).to include('port 3000')
+        expect(output).to include('Port: 3000')
       end
     end
 
     it 'accepts port option' do
-      allow(cli).to receive(:exec)
-      
-      cli.options = { 'port' => '4000' }
+      allow(cli).to receive(:options).and_return({ port: 4000 })
+
       output = capture_stdout { cli.server }
-      
-      expect(output).to include('port 4000')
+
+      expect(output).to include('Port: 4000')
     end
 
     it 'accepts environment option' do
-      allow(cli).to receive(:exec)
-      
-      cli.options = { 'environment' => 'production' }
+      allow(cli).to receive(:options).and_return({ environment: 'production' })
+
       output = capture_stdout { cli.server }
-      
-      expect(output).to include('environment: production')
+
+      expect(output).to include('Environment: production')
     end
   end
 
   describe '#status' do
     it 'displays application status' do
       output = capture_stdout { cli.status }
-      
+
       aggregate_failures do
         expect(output).to include('TCF Platform Status')
         expect(output).to include("Version: #{TcfPlatform.version}")

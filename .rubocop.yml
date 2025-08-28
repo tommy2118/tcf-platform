@@ -1,0 +1,17 @@
+AllCops:
+  NewCops: enable
+
+Style/Documentation:
+  Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/MethodLength:
+  Exclude:
+    - 'lib/cli/**/*'
+
+Metrics/AbcSize:
+  Exclude:
+    - 'lib/cli/**/*'

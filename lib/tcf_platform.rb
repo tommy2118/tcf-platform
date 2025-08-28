@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'pathname'
 require 'sinatra'
 
@@ -20,8 +22,6 @@ module TcfPlatform
   def self.env
     ENV.fetch('RACK_ENV', 'development')
   end
-
-  private
 
   def self.load_app
     require_relative '../app'

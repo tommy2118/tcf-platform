@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative 'spec_helper'
 
 RSpec.describe TcfPlatform do
@@ -22,7 +24,11 @@ RSpec.describe TcfPlatform do
 
   describe '.env' do
     it 'returns the current environment' do
+      original_env = ENV.fetch('RACK_ENV', nil)
+      ENV['RACK_ENV'] = 'test'
       expect(TcfPlatform.env).to eq('test')
+    ensure
+      ENV['RACK_ENV'] = original_env
     end
   end
 end

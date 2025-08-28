@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'sinatra/base'
 require 'sinatra/json'
 require 'json'
@@ -18,7 +20,7 @@ class TcfPlatformApp < Sinatra::Base
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    
+
     # CORS headers
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
@@ -30,23 +32,23 @@ class TcfPlatformApp < Sinatra::Base
   get '/health' do
     content_type :json
     json({
-      status: 'healthy',
-      timestamp: Time.now.iso8601,
-      version: ENV.fetch('APP_VERSION', '1.0.0'),
-      environment: ENV.fetch('RACK_ENV', 'development'),
-      service: 'tcf-platform'
-    })
+           status: 'healthy',
+           timestamp: Time.now.iso8601,
+           version: ENV.fetch('APP_VERSION', '1.0.0'),
+           environment: ENV.fetch('RACK_ENV', 'development'),
+           service: 'tcf-platform'
+         })
   end
 
   # 404 handler
   not_found do
     content_type :json
     json({
-      error: 'not_found',
-      message: 'The requested endpoint not found.',
-      status: 404,
-      timestamp: Time.now.iso8601
-    })
+           error: 'not_found',
+           message: 'The requested endpoint not found.',
+           status: 404,
+           timestamp: Time.now.iso8601
+         })
   end
 
   # Global error handler
@@ -57,9 +59,11 @@ class TcfPlatformApp < Sinatra::Base
 
     error_response = {
       error: 'internal_server_error',
-      message: ENV['RACK_ENV'] == 'production' ? 
-        'An internal error occurred' : 
-        'An internal error occurred while processing your request.',
+      message: if ENV['RACK_ENV'] == 'production'
+                 'An internal error occurred'
+               else
+                 'An internal error occurred while processing your request.'
+               end,
       status: 500,
       timestamp: Time.now.iso8601,
       error_id: SecureRandom.uuid

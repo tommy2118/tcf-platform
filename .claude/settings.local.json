@@ -4,7 +4,10 @@
       "Bash(rspec:*)",
       "Bash(git add:*)",
       "Bash(bundle install:*)",
-      "Bash(bundle exec rspec:*)"
+      "Bash(bundle exec rspec:*)",
+      "Bash(./bin/tcf-platform:*)",
+      "Bash(COVERAGE=true bundle exec rspec)",
+      "Bash(bundle exec rubocop:*)"
     ],
     "additionalDirectories": [
       "/Users/tcaruso/src/tcf-gateway"

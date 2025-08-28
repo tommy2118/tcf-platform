@@ -1,8 +1,11 @@
+# frozen_string_literal: true
+
 require 'rspec'
 require 'rack/test'
 require 'webmock/rspec'
 require 'json'
 require_relative '../lib/tcf_platform'
+require_relative '../lib/cli/platform_cli'
 
 # Test coverage
 if ENV['COVERAGE'] == 'true'
@@ -91,4 +94,11 @@ def expect_cors_headers
     'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers' => 'Content-Type, Authorization'
   )
+end
+
+# Add be_present matcher
+RSpec::Matchers.define :be_present do
+  match do |actual|
+    !actual.nil? && !actual.to_s.strip.empty?
+  end
 end
