@@ -286,7 +286,7 @@ jobs:
         done
         
         # Test CLI functionality
-        docker exec tcf-platform-test /app/bin/tcf-platform version
+        docker exec tcf-platform-test bundle exec /app/bin/tcf-platform version
         
         # Stop container
         docker stop tcf-platform-test
@@ -343,9 +343,9 @@ jobs:
         echo "Testing health endpoint..."
         curl -f http://localhost:3000/health | jq '.'
         
-        # Test CLI commands
+        # Test CLI commands with bundle exec to ensure proper gem loading
         echo "Testing CLI version command..."
-        ./bin/tcf-platform version
+        bundle exec ./bin/tcf-platform version
         
         echo "Integration tests passed!"
     
