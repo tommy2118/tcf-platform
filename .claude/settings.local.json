@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rspec:*)",
+      "Bash(git add:*)",
+      "Bash(bundle install:*)",
+      "Bash(bundle exec rspec:*)",
+      "Bash(./bin/tcf-platform:*)",
+      "Bash(COVERAGE=true bundle exec rspec)",
+      "Bash(bundle exec rubocop:*)",
+      "Bash(bundle exec bundle-audit check:*)",
+      "Bash(bundle exec brakeman:*)",
+      "Bash(git push:*)",
+      "Bash(docker build:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/tcaruso/src/tcf-gateway"
+    ]
+  }
+}

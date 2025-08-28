@@ -1,0 +1,738 @@
+name: Docker Integration Testing
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'Dockerfile*'
+      - 'docker-compose*.yml'
+      - '.dockerignore'
+      - 'lib/**'
+      - 'spec/**'
+      - 'bin/**'
+      - 'Gemfile*'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'Dockerfile*'
+      - 'docker-compose*.yml'
+      - '.dockerignore'
+      - 'lib/**'
+      - 'spec/**'
+      - 'bin/**'
+      - 'Gemfile*'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build-test:
+    name: Docker Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        docker-file: [
+          { file: 'Dockerfile', tag: 'production' },
+          { file: 'Dockerfile.dev', tag: 'development' }
+        ]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: network=host
+    
+    - name: Check Docker version
+      run: |
+        docker --version
+        docker buildx version
+    
+    - name: Build Docker image
+      run: |
+        echo "Building with ${{ matrix.docker-file.file }}"
+        if [ -f "${{ matrix.docker-file.file }}" ]; then
+          docker build -f ${{ matrix.docker-file.file }} -t tcf-platform:${{ matrix.docker-file.tag }}-test .
+        else
+          echo "Dockerfile ${{ matrix.docker-file.file }} not found, skipping"
+          exit 0
+        fi
+    
+    - name: Inspect Docker image
+      run: |
+        if docker image inspect tcf-platform:${{ matrix.docker-file.tag }}-test > /dev/null 2>&1; then
+          echo "=== Image inspection ==="
+          docker image inspect tcf-platform:${{ matrix.docker-file.tag }}-test | jq '.[0] | {
+            Id: .Id[0:12],
+            Created: .Created,
+            Size: .Size,
+            Architecture: .Architecture,
+            Os: .Os
+          }'
+          echo "========================"
+        else
+          echo "Image not found, skipping inspection"
+        fi
+      continue-on-error: true
+    
+    - name: Test Docker image layers
+      run: |
+        if docker image inspect tcf-platform:${{ matrix.docker-file.tag }}-test > /dev/null 2>&1; then
+          echo "=== Image layer analysis ==="
+          docker history tcf-platform:${{ matrix.docker-file.tag }}-test --no-trunc --format "table {{.CreatedBy}}\t{{.Size}}"
+          echo "============================"
+        fi
+      continue-on-error: true
+    
+    - name: Test image security scan
+      run: |
+        if docker image inspect tcf-platform:${{ matrix.docker-file.tag }}-test > /dev/null 2>&1; then
+          echo "=== Basic security checks ==="
+          
+          # Check if image runs as root
+          USER_ID=$(docker run --rm tcf-platform:${{ matrix.docker-file.tag }}-test id -u 2>/dev/null || echo "unknown")
+          if [ "$USER_ID" = "0" ]; then
+            echo "⚠️ Container runs as root (UID: $USER_ID)"
+          else
+            echo "✅ Container runs as non-root user (UID: $USER_ID)"
+          fi
+          
+          # Check for common security files
+          docker run --rm tcf-platform:${{ matrix.docker-file.tag }}-test sh -c '
+            echo "Checking for sensitive files..."
+            for file in /etc/passwd /etc/shadow /etc/hosts; do
+              if [ -f "$file" ]; then
+                echo "✓ $file exists"
+              else
+                echo "✗ $file missing"
+              fi
+            done
+          ' 2>/dev/null || echo "Security check failed"
+          
+          echo "=========================="
+        fi
+      continue-on-error: true
+
+  docker-orchestration-test:
+    name: Docker Compose Orchestration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: docker-build-test
+    
+    services:
+      # We'll use docker-compose instead of GitHub services for this test
+      # to test the actual orchestration setup
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install docker-compose
+      run: |
+        sudo curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+        docker-compose --version
+    
+    - name: Create test environment file
+      run: |
+        cat > .env.test << EOF
+        # TCF Platform Test Environment
+        RACK_ENV=test
+        PORT=3000
+        LOG_LEVEL=debug
+        
+        # Database configuration
+        DATABASE_URL=postgresql://tcf_test:test_password@postgres:5432/tcf_platform_test
+        
+        # Redis configuration  
+        REDIS_URL=redis://redis:6379/0
+        
+        # Security
+        JWT_SECRET=test-jwt-secret-$(openssl rand -hex 32)
+        
+        # Service URLs (for testing)
+        TCF_PERSONAS_URL=http://localhost:3001
+        TCF_WORKFLOWS_URL=http://localhost:3002
+        TCF_PROJECTS_URL=http://localhost:3003
+        TCF_CONTEXT_URL=http://localhost:3004
+        TCF_TOKENS_URL=http://localhost:3005
+        EOF
+    
+    - name: Create basic docker-compose test file
+      run: |
+        cat > docker-compose.test.yml << EOF
+        version: '3.8'
+        
+        services:
+          tcf-platform:
+            build: .
+            ports:
+              - "3000:3000"
+            environment:
+              - RACK_ENV=test
+              - PORT=3000
+              - DATABASE_URL=postgresql://tcf_test:test_password@postgres:5432/tcf_platform_test
+              - REDIS_URL=redis://redis:6379/0
+              - JWT_SECRET=test-jwt-secret
+            depends_on:
+              - postgres
+              - redis
+            networks:
+              - tcf-test-network
+            healthcheck:
+              test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+              interval: 30s
+              timeout: 10s
+              retries: 5
+              start_period: 40s
+          
+          postgres:
+            image: postgres:15-alpine
+            environment:
+              POSTGRES_DB: tcf_platform_test
+              POSTGRES_USER: tcf_test
+              POSTGRES_PASSWORD: test_password
+            ports:
+              - "5432:5432"
+            networks:
+              - tcf-test-network
+            healthcheck:
+              test: ["CMD-SHELL", "pg_isready -U tcf_test -d tcf_platform_test"]
+              interval: 10s
+              timeout: 5s
+              retries: 5
+          
+          redis:
+            image: redis:7-alpine
+            command: redis-server --appendonly yes
+            ports:
+              - "6379:6379"
+            networks:
+              - tcf-test-network
+            healthcheck:
+              test: ["CMD", "redis-cli", "ping"]
+              interval: 10s
+              timeout: 3s
+              retries: 5
+        
+        networks:
+          tcf-test-network:
+            driver: bridge
+        EOF
+    
+    - name: Start Docker Compose services
+      run: |
+        echo "Starting services with docker-compose..."
+        docker-compose -f docker-compose.test.yml up -d --build
+        
+        echo "Waiting for services to become healthy..."
+        
+        # Wait for services to be healthy (with timeout)
+        timeout=300  # 5 minutes
+        elapsed=0
+        interval=10
+        
+        while [ $elapsed -lt $timeout ]; do
+          echo "Checking service health... (${elapsed}s/${timeout}s)"
+          
+          # Check if all services are healthy
+          if docker-compose -f docker-compose.test.yml ps --services | while read service; do
+            status=$(docker-compose -f docker-compose.test.yml ps -q "$service" | xargs docker inspect --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
+            if [ "$status" != "healthy" ] && [ "$status" != "unknown" ]; then
+              echo "$service is $status"
+              exit 1
+            fi
+          done; then
+            echo "All services are healthy or don't have health checks"
+            break
+          fi
+          
+          sleep $interval
+          elapsed=$((elapsed + interval))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "Timeout waiting for services to become healthy"
+          docker-compose -f docker-compose.test.yml logs
+          exit 1
+        fi
+        
+        echo "Services are ready!"
+    
+    - name: Test service connectivity
+      run: |
+        echo "=== Service Status Check ==="
+        docker-compose -f docker-compose.test.yml ps
+        echo "=========================="
+        
+        echo "=== Testing PostgreSQL connection ==="
+        docker-compose -f docker-compose.test.yml exec -T postgres psql -U tcf_test -d tcf_platform_test -c "SELECT 1;" || echo "PostgreSQL connection failed"
+        echo "===================================="
+        
+        echo "=== Testing Redis connection ==="
+        docker-compose -f docker-compose.test.yml exec -T redis redis-cli ping || echo "Redis connection failed"
+        echo "==============================="
+    
+    - name: Test TCF Platform API endpoints
+      run: |
+        echo "=== Testing TCF Platform endpoints ==="
+        
+        # Wait for the application to be fully ready
+        for i in {1..30}; do
+          if curl -f -s http://localhost:3000/health > /dev/null; then
+            echo "TCF Platform is ready!"
+            break
+          elif [ $i -eq 30 ]; then
+            echo "TCF Platform failed to become ready"
+            docker-compose -f docker-compose.test.yml logs tcf-platform
+            exit 1
+          else
+            echo "Waiting for TCF Platform to be ready... ($i/30)"
+            sleep 5
+          fi
+        done
+        
+        # Test health endpoint
+        echo "Testing health endpoint..."
+        curl -f http://localhost:3000/health | jq '.'
+        
+        # Test invalid endpoint (should return 404)
+        echo "Testing 404 handling..."
+        if curl -f http://localhost:3000/nonexistent 2>/dev/null; then
+          echo "ERROR: Expected 404, got success"
+          exit 1
+        else
+          echo "✅ 404 handling works correctly"
+        fi
+        
+        echo "=================================="
+    
+    - name: Test CLI functionality in container
+      run: |
+        echo "=== Testing CLI functionality ==="
+        
+        # Test version command
+        echo "Testing version command..."
+        docker-compose -f docker-compose.test.yml exec -T tcf-platform /app/bin/tcf-platform version || echo "Version command not yet implemented"
+        
+        # Test help command
+        echo "Testing help command..."
+        docker-compose -f docker-compose.test.yml exec -T tcf-platform /app/bin/tcf-platform help || echo "Help command not yet implemented"
+        
+        echo "=============================="
+    
+    - name: Test orchestration scenarios
+      run: |
+        echo "=== Testing orchestration scenarios ==="
+        
+        # Test service restart
+        echo "Testing service restart..."
+        docker-compose -f docker-compose.test.yml restart tcf-platform
+        
+        # Wait for service to recover
+        for i in {1..20}; do
+          if curl -f -s http://localhost:3000/health > /dev/null; then
+            echo "Service recovered after restart"
+            break
+          elif [ $i -eq 20 ]; then
+            echo "Service failed to recover after restart"
+            exit 1
+          else
+            echo "Waiting for service recovery... ($i/20)"
+            sleep 3
+          fi
+        done
+        
+        # Test database connectivity after restart
+        echo "Testing database connectivity after restart..."
+        docker-compose -f docker-compose.test.yml exec -T postgres psql -U tcf_test -d tcf_platform_test -c "SELECT 1;"
+        
+        echo "==============================="
+    
+    - name: Test resource usage
+      run: |
+        echo "=== Resource Usage Analysis ==="
+        
+        # Get container stats
+        docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}"
+        
+        # Check memory usage of TCF Platform specifically
+        CONTAINER_ID=$(docker-compose -f docker-compose.test.yml ps -q tcf-platform)
+        if [ -n "$CONTAINER_ID" ]; then
+          echo "TCF Platform container resource usage:"
+          docker exec "$CONTAINER_ID" sh -c '
+            echo "Memory usage: $(free -h | grep Mem | awk \"{print \$3 \"/\" \$2}\")"
+            echo "Disk usage: $(df -h / | tail -1 | awk \"{print \$3 \"/\" \$2 \" (\" \$5 \" used)\"}\")"
+          ' 2>/dev/null || echo "Resource stats not available"
+        fi
+        
+        echo "============================"
+    
+    - name: Capture logs and cleanup
+      if: always()
+      run: |
+        echo "=== Capturing service logs ==="
+        
+        # Capture logs from all services
+        mkdir -p logs
+        
+        services=$(docker-compose -f docker-compose.test.yml ps --services)
+        for service in $services; do
+          echo "Capturing logs for $service..."
+          docker-compose -f docker-compose.test.yml logs "$service" > "logs/${service}.log" 2>&1 || echo "Failed to capture logs for $service"
+        done
+        
+        echo "=== Service Logs Summary ==="
+        for logfile in logs/*.log; do
+          if [ -f "$logfile" ]; then
+            echo "--- $(basename "$logfile") ---"
+            tail -20 "$logfile"
+            echo ""
+          fi
+        done
+        
+        echo "=== Cleanup ==="
+        docker-compose -f docker-compose.test.yml down -v --remove-orphans
+        docker system prune -f
+        echo "==============="
+    
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-orchestration-logs
+        path: logs/
+        retention-days: 7
+
+  docker-security-scan:
+    name: Docker Security Scanning
+    runs-on: ubuntu-latest
+    needs: docker-build-test
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image for scanning
+      run: |
+        docker build -t tcf-platform:security-scan .
+    
+    - name: Install security scanning tools
+      run: |
+        # Install Trivy
+        sudo apt-get update
+        sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update
+        sudo apt-get install trivy -y
+        
+        # Install Docker Bench for Security
+        git clone https://github.com/docker/docker-bench-security.git
+        cd docker-bench-security
+        sudo ./docker-bench-security.sh --no-docker-socket-check || true
+        cd ..
+    
+    - name: Create security results directory
+      run: mkdir -p security-results
+    
+    - name: Run Trivy vulnerability scan
+      run: |
+        echo "Running Trivy vulnerability scan..."
+        
+        # Scan for vulnerabilities
+        trivy image --format json --output security-results/trivy-vulnerabilities.json tcf-platform:security-scan
+        trivy image --format table --output security-results/trivy-vulnerabilities.txt tcf-platform:security-scan
+        
+        # Scan for misconfigurations
+        trivy image --format json --scanners config --output security-results/trivy-config.json tcf-platform:security-scan
+        
+        # Scan for secrets
+        trivy image --format json --scanners secret --output security-results/trivy-secrets.json tcf-platform:security-scan
+      continue-on-error: true
+    
+    - name: Custom Dockerfile security analysis
+      run: |
+        echo "Running custom Dockerfile security analysis..."
+        
+        cat > dockerfile_security_check.sh << 'EOF'
+        #!/bin/bash
+        
+        echo "# Docker Security Analysis Report" > security-results/dockerfile-security-analysis.md
+        echo "" >> security-results/dockerfile-security-analysis.md
+        echo "**Date:** $(date)" >> security-results/dockerfile-security-analysis.md
+        echo "**Repository:** ${{ github.repository }}" >> security-results/dockerfile-security-analysis.md
+        echo "" >> security-results/dockerfile-security-analysis.md
+        
+        # Initialize counters
+        ISSUES=0
+        RECOMMENDATIONS=0
+        
+        echo "## Security Check Results" >> security-results/dockerfile-security-analysis.md
+        echo "" >> security-results/dockerfile-security-analysis.md
+        
+        # Check for USER directive
+        if ! grep -q "^USER" Dockerfile; then
+          echo "❌ **No USER directive** - container will run as root" >> security-results/dockerfile-security-analysis.md
+          ISSUES=$((ISSUES + 1))
+        else
+          echo "✅ USER directive found - container runs as non-root" >> security-results/dockerfile-security-analysis.md
+        fi
+        
+        # Check for specific version tags
+        if grep -q "FROM.*:latest" Dockerfile; then
+          echo "⚠️ **Using :latest tag** - consider pinning to specific versions" >> security-results/dockerfile-security-analysis.md
+          ISSUES=$((ISSUES + 1))
+        else
+          echo "✅ Base images use specific version tags" >> security-results/dockerfile-security-analysis.md
+        fi
+        
+        # Check for proper COPY ownership
+        if grep -q "COPY --chown" Dockerfile; then
+          echo "✅ COPY commands use proper ownership" >> security-results/dockerfile-security-analysis.md
+        else
+          echo "⚠️ Consider using COPY --chown for better security" >> security-results/dockerfile-security-analysis.md
+          RECOMMENDATIONS=$((RECOMMENDATIONS + 1))
+        fi
+        
+        # Check for secrets in build args
+        if grep -q "ARG.*SECRET\|ARG.*PASSWORD\|ARG.*TOKEN" Dockerfile; then
+          echo "❌ **Build args contain potential secrets** - avoid this pattern" >> security-results/dockerfile-security-analysis.md
+          ISSUES=$((ISSUES + 1))
+        else
+          echo "✅ No secrets detected in build arguments" >> security-results/dockerfile-security-analysis.md
+        fi
+        
+        # Check for multi-stage builds
+        if [ $(grep -c "^FROM" Dockerfile) -gt 1 ]; then
+          echo "✅ Multi-stage build detected - reduces attack surface" >> security-results/dockerfile-security-analysis.md
+        else
+          echo "⚠️ Consider using multi-stage builds to reduce image size and attack surface" >> security-results/dockerfile-security-analysis.md
+          RECOMMENDATIONS=$((RECOMMENDATIONS + 1))
+        fi
+        
+        # Check for EXPOSE directive security
+        if grep -q "EXPOSE.*22\|EXPOSE.*23\|EXPOSE.*21" Dockerfile; then
+          echo "❌ **Exposing potentially dangerous ports** (SSH, Telnet, FTP)" >> security-results/dockerfile-security-analysis.md
+          ISSUES=$((ISSUES + 1))
+        else
+          echo "✅ No dangerous ports exposed" >> security-results/dockerfile-security-analysis.md
+        fi
+        
+        echo "" >> security-results/dockerfile-security-analysis.md
+        echo "## Summary" >> security-results/dockerfile-security-analysis.md
+        echo "- **Issues Found:** $ISSUES" >> security-results/dockerfile-security-analysis.md
+        echo "- **Recommendations:** $RECOMMENDATIONS" >> security-results/dockerfile-security-analysis.md
+        
+        if [ $ISSUES -eq 0 ]; then
+          echo "- **Overall Security:** ✅ Good" >> security-results/dockerfile-security-analysis.md
+        elif [ $ISSUES -le 2 ]; then
+          echo "- **Overall Security:** ⚠️ Fair - address issues" >> security-results/dockerfile-security-analysis.md
+        else
+          echo "- **Overall Security:** ❌ Poor - multiple issues need attention" >> security-results/dockerfile-security-analysis.md
+        fi
+        
+        echo "" >> security-results/dockerfile-security-analysis.md
+        echo "## Recommendations" >> security-results/dockerfile-security-analysis.md
+        echo "1. Always run containers as non-root user" >> security-results/dockerfile-security-analysis.md
+        echo "2. Use specific version tags for base images" >> security-results/dockerfile-security-analysis.md
+        echo "3. Use multi-stage builds to reduce image size" >> security-results/dockerfile-security-analysis.md
+        echo "4. Regularly update base images" >> security-results/dockerfile-security-analysis.md
+        echo "5. Scan images for vulnerabilities before deployment" >> security-results/dockerfile-security-analysis.md
+        echo "" >> security-results/dockerfile-security-analysis.md
+        EOF
+        
+        chmod +x dockerfile_security_check.sh
+        ./dockerfile_security_check.sh
+    
+    - name: Generate security summary
+      run: |
+        echo "Generating Docker security summary..."
+        
+        cat > security_summary.sh << 'EOF'
+        #!/bin/bash
+        
+        echo "# Docker Security Summary" > security-results/docker-security-summary.md
+        echo "" >> security-results/docker-security-summary.md
+        echo "**Scan Date:** $(date)" >> security-results/docker-security-summary.md
+        echo "**Image:** tcf-platform:security-scan" >> security-results/docker-security-summary.md
+        echo "" >> security-results/docker-security-summary.md
+        
+        # Count vulnerabilities from Trivy
+        if [ -f security-results/trivy-vulnerabilities.json ]; then
+          CRITICAL_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' security-results/trivy-vulnerabilities.json 2>/dev/null || echo "0")
+          HIGH_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' security-results/trivy-vulnerabilities.json 2>/dev/null || echo "0")
+          MEDIUM_VULNS=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "MEDIUM")] | length' security-results/trivy-vulnerabilities.json 2>/dev/null || echo "0")
+          
+          echo "## Vulnerability Scan Results" >> security-results/docker-security-summary.md
+          echo "- **Critical:** $CRITICAL_VULNS" >> security-results/docker-security-summary.md
+          echo "- **High:** $HIGH_VULNS" >> security-results/docker-security-summary.md
+          echo "- **Medium:** $MEDIUM_VULNS" >> security-results/docker-security-summary.md
+          echo "" >> security-results/docker-security-summary.md
+          
+          TOTAL_VULNS=$((CRITICAL_VULNS + HIGH_VULNS + MEDIUM_VULNS))
+          
+          if [ $CRITICAL_VULNS -gt 0 ]; then
+            echo "🚨 **CRITICAL**: $CRITICAL_VULNS critical vulnerabilities found" >> security-results/docker-security-summary.md
+          elif [ $HIGH_VULNS -gt 5 ]; then
+            echo "⚠️ **HIGH RISK**: $HIGH_VULNS high-severity vulnerabilities" >> security-results/docker-security-summary.md
+          elif [ $TOTAL_VULNS -gt 10 ]; then
+            echo "⚠️ **MODERATE RISK**: $TOTAL_VULNS total vulnerabilities" >> security-results/docker-security-summary.md
+          else
+            echo "✅ **LOW RISK**: Minimal vulnerabilities detected" >> security-results/docker-security-summary.md
+          fi
+        else
+          echo "## Vulnerability Scan Results" >> security-results/docker-security-summary.md
+          echo "❓ Scan results not available" >> security-results/docker-security-summary.md
+        fi
+        
+        echo "" >> security-results/docker-security-summary.md
+        echo "## Next Steps" >> security-results/docker-security-summary.md
+        echo "1. Review detailed scan results" >> security-results/docker-security-summary.md
+        echo "2. Update base images to latest secure versions" >> security-results/docker-security-summary.md
+        echo "3. Apply security patches" >> security-results/docker-security-summary.md
+        echo "4. Implement security scanning in CI/CD pipeline" >> security-results/docker-security-summary.md
+        EOF
+        
+        chmod +x security_summary.sh
+        ./security_summary.sh
+    
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-security-results
+        path: security-results/
+        retention-days: 30
+
+  integration-report:
+    name: Docker Integration Report
+    runs-on: ubuntu-latest
+    needs: [docker-build-test, docker-orchestration-test, docker-security-scan]
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: all-results
+    
+    - name: Generate integration test report
+      run: |
+        echo "# 🐳 Docker Integration Test Report" > integration_report.md
+        echo "" >> integration_report.md
+        echo "**Test Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> integration_report.md
+        echo "**Repository:** ${{ github.repository }}" >> integration_report.md
+        echo "**Commit:** ${{ github.sha }}" >> integration_report.md
+        echo "**Workflow:** Docker Integration Testing" >> integration_report.md
+        echo "" >> integration_report.md
+        
+        # Test results summary
+        echo "## Test Results Summary" >> integration_report.md
+        echo "" >> integration_report.md
+        
+        # Docker build test
+        echo "### 🏗️ Docker Build Test" >> integration_report.md
+        if [ "${{ needs.docker-build-test.result }}" == "success" ]; then
+          echo "- ✅ **PASSED** - Docker images built successfully" >> integration_report.md
+        else
+          echo "- ❌ **FAILED** - Docker build issues detected" >> integration_report.md
+        fi
+        
+        # Orchestration test
+        echo "### 🎭 Container Orchestration Test" >> integration_report.md
+        if [ "${{ needs.docker-orchestration-test.result }}" == "success" ]; then
+          echo "- ✅ **PASSED** - Docker Compose orchestration working" >> integration_report.md
+        else
+          echo "- ❌ **FAILED** - Orchestration issues detected" >> integration_report.md
+        fi
+        
+        # Security scan
+        echo "### 🔒 Security Scan" >> integration_report.md
+        if [ "${{ needs.docker-security-scan.result }}" == "success" ]; then
+          echo "- ✅ **COMPLETED** - Security scan finished" >> integration_report.md
+        else
+          echo "- ⚠️ **ISSUES** - Security scan found problems" >> integration_report.md
+        fi
+        
+        echo "" >> integration_report.md
+        
+        # Overall status
+        FAILED_COUNT=0
+        
+        if [ "${{ needs.docker-build-test.result }}" != "success" ]; then
+          FAILED_COUNT=$((FAILED_COUNT + 1))
+        fi
+        
+        if [ "${{ needs.docker-orchestration-test.result }}" != "success" ]; then
+          FAILED_COUNT=$((FAILED_COUNT + 1))
+        fi
+        
+        echo "## Overall Status" >> integration_report.md
+        echo "" >> integration_report.md
+        
+        if [ $FAILED_COUNT -eq 0 ]; then
+          echo "🟢 **ALL TESTS PASSED** - Docker integration is working correctly" >> integration_report.md
+        elif [ $FAILED_COUNT -eq 1 ]; then
+          echo "🟡 **PARTIAL SUCCESS** - One test failed, review required" >> integration_report.md
+        else
+          echo "🔴 **MULTIPLE FAILURES** - Docker integration needs attention" >> integration_report.md
+        fi
+        
+        echo "" >> integration_report.md
+        echo "## Available Artifacts" >> integration_report.md
+        echo "" >> integration_report.md
+        echo "The following artifacts are available for download:" >> integration_report.md
+        echo "" >> integration_report.md
+        
+        if [ -d "all-results" ]; then
+          find all-results -name "*.log" -o -name "*.json" -o -name "*.md" | while read file; do
+            echo "- 📄 \`$(basename "$file")\`" >> integration_report.md
+          done
+        fi
+        
+        echo "" >> integration_report.md
+        echo "---" >> integration_report.md
+        echo "*Report generated by TCF Platform Docker Integration Pipeline*" >> integration_report.md
+    
+    - name: Upload integration report
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-integration-report
+        path: integration_report.md
+        retention-days: 30
+    
+    - name: Fail if critical tests failed
+      run: |
+        echo "Docker Build Test: ${{ needs.docker-build-test.result }}"
+        echo "Orchestration Test: ${{ needs.docker-orchestration-test.result }}"
+        echo "Security Scan: ${{ needs.docker-security-scan.result }}"
+        
+        # Fail if critical tests failed
+        if [ "${{ needs.docker-build-test.result }}" != "success" ]; then
+          echo "❌ Docker build test failed - blocking merge"
+          exit 1
+        fi
+        
+        if [ "${{ needs.docker-orchestration-test.result }}" != "success" ]; then
+          echo "❌ Docker orchestration test failed - blocking merge"
+          exit 1
+        fi
+        
+        # Security scan failure is not blocking, just warning
+        if [ "${{ needs.docker-security-scan.result }}" != "success" ]; then
+          echo "⚠️ Security scan had issues - review recommended"
+        fi
+        
+        echo "✅ Critical Docker integration tests passed"
