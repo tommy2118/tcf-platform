@@ -16,10 +16,13 @@ RSpec.describe TcfPlatform::ServiceHealthMonitor do
     context 'when all services are healthy' do
       before do
         allow(docker_manager).to receive(:service_status).and_return({
-          gateway: { status: 'running', health: 'healthy' },
-          personas: { status: 'running', health: 'healthy' },
-          workflows: { status: 'running', health: 'healthy' }
-        })
+                                                                       gateway: { status: 'running',
+                                                                                  health: 'healthy' },
+                                                                       personas: { status: 'running',
+                                                                                   health: 'healthy' },
+                                                                       workflows: { status: 'running',
+                                                                                    health: 'healthy' }
+                                                                     })
       end
 
       it 'reports overall status as healthy' do
@@ -47,10 +50,13 @@ RSpec.describe TcfPlatform::ServiceHealthMonitor do
     context 'when some services are unhealthy' do
       before do
         allow(docker_manager).to receive(:service_status).and_return({
-          gateway: { status: 'running', health: 'healthy' },
-          personas: { status: 'exited', health: 'unhealthy' },
-          workflows: { status: 'running', health: 'healthy' }
-        })
+                                                                       gateway: { status: 'running',
+                                                                                  health: 'healthy' },
+                                                                       personas: { status: 'exited',
+                                                                                   health: 'unhealthy' },
+                                                                       workflows: { status: 'running',
+                                                                                    health: 'healthy' }
+                                                                     })
       end
 
       it 'reports overall status as degraded' do
@@ -74,10 +80,13 @@ RSpec.describe TcfPlatform::ServiceHealthMonitor do
     context 'when all services are down' do
       before do
         allow(docker_manager).to receive(:service_status).and_return({
-          gateway: { status: 'exited', health: 'unhealthy' },
-          personas: { status: 'exited', health: 'unhealthy' },
-          workflows: { status: 'exited', health: 'unhealthy' }
-        })
+                                                                       gateway: { status: 'exited',
+                                                                                  health: 'unhealthy' },
+                                                                       personas: { status: 'exited',
+                                                                                   health: 'unhealthy' },
+                                                                       workflows: { status: 'exited',
+                                                                                    health: 'unhealthy' }
+                                                                     })
       end
 
       it 'reports overall status as critical' do

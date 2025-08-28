@@ -141,7 +141,7 @@ RSpec.describe TcfPlatform::MonitoringDashboard do
 
     it 'includes collection timestamp' do
       result = dashboard.collect_all_data
-      
+
       expect(result[:collected_at]).to be_a(Time)
       expect(result[:collected_at]).to be_within(1).of(Time.now)
     end
@@ -378,21 +378,21 @@ RSpec.describe TcfPlatform::MonitoringDashboard do
 
     it 'exports monitoring data as JSON' do
       json_data = dashboard.export_data('json')
-      
+
       expect(json_data).to be_a(String)
       expect { JSON.parse(json_data) }.not_to raise_error
     end
 
     it 'exports monitoring data as CSV' do
       csv_data = dashboard.export_data('csv')
-      
+
       expect(csv_data).to be_a(String)
       expect(csv_data).to include('service_name,status,cpu_percent,memory_percent')
     end
 
     it 'defaults to JSON format when no format specified' do
       json_data = dashboard.export_data
-      
+
       expect(json_data).to be_a(String)
       expect { JSON.parse(json_data) }.not_to raise_error
     end

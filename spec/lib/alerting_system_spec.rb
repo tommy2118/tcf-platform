@@ -11,7 +11,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
       alerting_system.configure_thresholds(cpu_percent: { warning: 70.0, critical: 90.0 })
 
       thresholds = alerting_system.thresholds
-      
+
       aggregate_failures do
         expect(thresholds[:cpu_percent][:warning]).to eq(70.0)
         expect(thresholds[:cpu_percent][:critical]).to eq(90.0)
@@ -22,7 +22,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
       alerting_system.configure_thresholds(memory_percent: { warning: 80.0, critical: 95.0 })
 
       thresholds = alerting_system.thresholds
-      
+
       aggregate_failures do
         expect(thresholds[:memory_percent][:warning]).to eq(80.0)
         expect(thresholds[:memory_percent][:critical]).to eq(95.0)
@@ -33,7 +33,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
       alerting_system.configure_thresholds(response_time_ms: { warning: 1000, critical: 5000 })
 
       thresholds = alerting_system.thresholds
-      
+
       aggregate_failures do
         expect(thresholds[:response_time_ms][:warning]).to eq(1000)
         expect(thresholds[:response_time_ms][:critical]).to eq(5000)
@@ -48,7 +48,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
       )
 
       thresholds = alerting_system.thresholds
-      
+
       aggregate_failures do
         expect(thresholds[:cpu_percent][:warning]).to eq(60.0)
         expect(thresholds[:memory_percent][:critical]).to eq(90.0)
@@ -92,7 +92,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
       it 'records metrics as healthy' do
         alerting_system.check_thresholds(metrics)
         history = alerting_system.alert_history
-        
+
         expect(history.last[:status]).to eq('healthy')
       end
     end
@@ -121,7 +121,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
         aggregate_failures do
           expect(alerts.size).to eq(3)
           expect(alerts).to all(include(level: 'warning'))
-          
+
           alert_messages = alerts.map { |a| a[:message] }
           expect(alert_messages).to include(match(/gateway.*CPU usage.*75.5%.*exceeds warning threshold/))
           expect(alert_messages).to include(match(/gateway.*response time.*1250.0ms.*exceeds warning threshold/))
@@ -167,7 +167,7 @@ RSpec.describe TcfPlatform::AlertingSystem do
         aggregate_failures do
           expect(alerts.size).to eq(3)
           expect(alerts.count { |a| a[:level] == 'critical' }).to eq(3)
-          
+
           alert_messages = alerts.map { |a| a[:message] }
           expect(alert_messages).to include(match(/gateway.*CPU usage.*92.3%.*exceeds critical threshold/))
           expect(alert_messages).to include(match(/personas.*memory usage.*97.8%.*exceeds critical threshold/))
@@ -193,10 +193,10 @@ RSpec.describe TcfPlatform::AlertingSystem do
 
         aggregate_failures do
           expect(alerts.size).to eq(2)
-          
+
           cpu_alert = alerts.find { |a| a[:metric] == 'cpu_percent' }
           memory_alert = alerts.find { |a| a[:metric] == 'memory_percent' }
-          
+
           expect(cpu_alert[:level]).to eq('warning')
           expect(memory_alert[:level]).to eq('critical')
         end
@@ -286,13 +286,13 @@ RSpec.describe TcfPlatform::AlertingSystem do
         # First check - violations
         high_metrics = { gateway: { cpu_percent: 92.0, timestamp: Time.now } }
         alerting_system.check_thresholds(high_metrics)
-        
+
         expect(alerting_system.active_alerts).not_to be_empty
 
         # Second check - normal
         normal_metrics = { gateway: { cpu_percent: 45.0, timestamp: Time.now } }
         alerting_system.check_thresholds(normal_metrics)
-        
+
         expect(alerting_system.active_alerts).to be_empty
       end
     end
@@ -308,15 +308,15 @@ RSpec.describe TcfPlatform::AlertingSystem do
         expect(thresholds[:memory_percent][:warning]).to eq(85.0)
         expect(thresholds[:memory_percent][:critical]).to eq(98.0)
         expect(thresholds[:response_time_ms][:warning]).to eq(2000)
-        expect(thresholds[:response_time_ms][:critical]).to eq(10000)
+        expect(thresholds[:response_time_ms][:critical]).to eq(10_000)
       end
     end
 
     it 'returns configured custom thresholds' do
       alerting_system.configure_thresholds(cpu_percent: { warning: 60.0, critical: 85.0 })
-      
+
       thresholds = alerting_system.thresholds
-      
+
       aggregate_failures do
         expect(thresholds[:cpu_percent][:warning]).to eq(60.0)
         expect(thresholds[:cpu_percent][:critical]).to eq(85.0)

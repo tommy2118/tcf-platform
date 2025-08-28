@@ -142,6 +142,7 @@ module TcfPlatform
 
     public
 
+    # rubocop:disable Metrics/AbcSize
     def service_uptime(service_name)
       return 'unknown' unless compose_file_exists?
 
@@ -158,9 +159,10 @@ module TcfPlatform
       return 'unknown' unless created_at
 
       calculate_uptime_from_created(created_at)
-    rescue JSON::ParserError, StandardError
+    rescue StandardError
       'unknown'
     end
+    # rubocop:enable Metrics/AbcSize
 
     private
 
@@ -172,10 +174,10 @@ module TcfPlatform
         "#{uptime_seconds.to_i} seconds"
       elsif uptime_seconds < 3600
         "#{(uptime_seconds / 60).to_i} minutes"
-      elsif uptime_seconds < 86400
+      elsif uptime_seconds < 86_400
         "#{(uptime_seconds / 3600).to_i} hours"
       else
-        "#{(uptime_seconds / 86400).to_i} days"
+        "#{(uptime_seconds / 86_400).to_i} days"
       end
     rescue StandardError
       'unknown'
