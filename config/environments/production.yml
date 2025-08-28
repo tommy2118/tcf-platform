@@ -1,0 +1,41 @@
+# TCF Platform - Production Environment Configuration
+# Production values are primarily loaded from environment variables
+
+# Required environment variables:
+# - DATABASE_URL
+# - JWT_SECRET
+# - REDIS_URL
+# - OPENAI_API_KEY (optional but recommended)
+# - ANTHROPIC_API_KEY (optional but recommended)
+
+# Service URLs (Docker container internal networking)
+services:
+  gateway:
+    port: 3000
+    url: "http://gateway:3000"
+  personas:
+    port: 3001
+    url: "http://personas:3001"
+  workflows:
+    port: 3002
+    url: "http://workflows:3002"
+  projects:
+    port: 3003
+    url: "http://projects:3003"
+  context:
+    port: 3004
+    url: "http://context:3004"
+  tokens:
+    port: 3005
+    url: "http://tokens:3005"
+
+# External Services (Docker container networking)
+external_services:
+  qdrant_url: "http://qdrant:6333"
+  postgres_url: "postgresql://postgres:5432"
+  redis_url: "redis://redis:6379"
+
+# All sensitive values loaded from environment
+api_keys:
+  openai_api_key: "${OPENAI_API_KEY}"
+  anthropic_api_key: "${ANTHROPIC_API_KEY}"

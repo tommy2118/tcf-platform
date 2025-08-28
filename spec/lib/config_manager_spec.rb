@@ -10,6 +10,9 @@ RSpec.describe TcfPlatform::ConfigManager do
     # Clean environment for each test
     ENV.clear
     ENV.update(original_env)
+    # Ensure spec_helper values are available for tests that need them
+    ENV['JWT_SECRET'] ||= 'test-secret-key'
+    ENV['REDIS_URL'] ||= 'redis://localhost:6379/0'
   end
 
   after do
