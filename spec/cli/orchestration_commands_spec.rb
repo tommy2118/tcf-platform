@@ -7,6 +7,11 @@ require_relative '../../lib/cli/platform_cli'
 RSpec.describe TcfPlatform::CLI do
   subject(:cli) { described_class.new }
 
+  # Mock Open3.capture3 to avoid actual Docker calls in CI
+  before do
+    allow(Open3).to receive(:capture3).and_return(['', '', double(success?: true)])
+  end
+
   # Helper method to capture stdout
   def capture_stdout
     original_stdout = $stdout

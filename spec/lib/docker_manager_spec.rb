@@ -7,6 +7,11 @@ require_relative '../../lib/docker_manager'
 RSpec.describe TcfPlatform::DockerManager do
   subject(:docker_manager) { described_class.new }
 
+  # Mock Open3.capture3 to avoid actual Docker calls in CI
+  before do
+    allow(Open3).to receive(:capture3).and_return(['', '', double(success?: true)])
+  end
+
   describe '#running_services' do
     it 'detects running TCF services' do
       # Mock docker-compose ps to return a running tcf-gateway service
