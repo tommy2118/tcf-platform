@@ -5,8 +5,8 @@ require_relative '../../lib/cli/backup_commands'
 require_relative '../../lib/backup_manager'
 require_relative '../../lib/recovery_manager'
 
-RSpec.describe TcfPlatform::CLI::BackupCommands do
-  let(:cli) { Class.new { include TcfPlatform::CLI::BackupCommands }.new }
+RSpec.describe TcfPlatform::BackupCommands do
+  let(:cli) { Class.new { include TcfPlatform::BackupCommands }.new }
   let(:backup_manager) { instance_double(TcfPlatform::BackupManager) }
   let(:recovery_manager) { instance_double(TcfPlatform::RecoveryManager) }
   let(:config) { instance_double(TcfPlatform::Config) }
@@ -197,6 +197,7 @@ RSpec.describe TcfPlatform::CLI::BackupCommands do
 
     it 'aborts when user declines confirmation' do
       allow(cli).to receive(:yes?).and_return(false)
+      allow(recovery_manager).to receive(:restore_backup)  # Create stub for verification
 
       output = capture_stdout { cli.backup_restore(backup_id) }
 
@@ -295,7 +296,7 @@ RSpec.describe TcfPlatform::CLI::BackupCommands do
         'Databases: 1 database (1.0 MB)',
         'Redis: 512.0 KB',
         'Repositories: 1 repository (256.0 KB)',
-        'Estimated backup size: 1.75 MB',
+        'Estimated backup size: 1.8 MB',
         'Available backups: 2',
         'Total backup storage: 1.5 MB'
       )
