@@ -29,6 +29,7 @@ module TcfPlatform
     require_relative 'service_registry'
     require_relative 'docker_manager'
     require_relative 'config_manager'
+    require_relative 'config_generator'
     @app = TcfPlatformApp
   end
 end

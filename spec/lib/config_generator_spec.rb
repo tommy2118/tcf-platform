@@ -416,10 +416,25 @@ RSpec.describe TcfPlatform::ConfigGenerator do
     end
 
     it 'validates template syntax is correct' do
-      allow(development_generator).to receive(:template_content).and_return('{{ invalid_template')
+      # Mock File.read to return valid content for existence check but ERB.new to fail
+      allow(File).to receive(:exist?).and_return(true)
+      allow(File).to receive(:read).and_return('valid template content')
+      
+      # Mock ERB.new to raise an exception on the first call
+      original_erb_new = ERB.method(:new)
+      call_count = 0
+      
+      allow(ERB).to receive(:new) do |content|
+        call_count += 1
+        if call_count == 1
+          raise StandardError, "Template syntax error"
+        else
+          original_erb_new.call(content)
+        end
+      end
       
       expect {
-        development_generator.validate_templates
+        development_generator.validate_templates  
       }.to raise_error(TcfPlatform::ConfigurationError, /Invalid template syntax/)
     end
   end

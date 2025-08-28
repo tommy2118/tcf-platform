@@ -6,6 +6,7 @@ require 'webmock/rspec'
 require 'json'
 require_relative '../lib/tcf_platform'
 require_relative '../lib/config_manager'
+require_relative '../lib/config_generator'
 require_relative '../lib/cli/platform_cli'
 
 # Test coverage
