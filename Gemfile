@@ -29,6 +29,9 @@ gem 'dotenv'
 # JSON handling
 gem 'multi_json'
 
+# Database
+gem 'pg', '~> 1.5'
+
 # CLI tools
 gem 'thor', '~> 1.3'
 
