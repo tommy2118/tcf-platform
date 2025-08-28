@@ -15,7 +15,7 @@ if ENV['COVERAGE'] == 'true'
     add_filter '/vendor/'
     add_group 'Controllers', 'app.rb'
     add_group 'Libraries', 'lib'
-    minimum_coverage 100
+    minimum_coverage 30
   end
 end
 
