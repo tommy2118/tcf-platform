@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require_relative '../../lib/backup_manager'
 require_relative '../../lib/recovery_manager'
 
 RSpec.describe TcfPlatform::RecoveryManager do
