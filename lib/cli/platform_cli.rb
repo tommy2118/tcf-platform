@@ -4,12 +4,14 @@ require 'thor'
 require_relative '../tcf_platform'
 require_relative 'orchestration_commands'
 require_relative 'status_commands'
+require_relative 'config_commands'
 
 module TcfPlatform
   # Main CLI class for TCF Platform management
   class CLI < Thor
     include OrchestrationCommands
     include StatusCommands
+    include ConfigCommands
 
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
 
@@ -31,6 +33,14 @@ module TcfPlatform
         puts '  tcf-platform up [SERVICE]      # Start TCF Platform services'
         puts '  tcf-platform down              # Stop TCF Platform services'
         puts '  tcf-platform restart [SERVICE] # Restart TCF Platform services'
+        puts ''
+        puts 'Configuration Commands:'
+        puts '  tcf-platform config            # Display configuration help'
+        puts '  tcf-platform generate <env>    # Generate configuration files'
+        puts '  tcf-platform validate          # Validate configuration'
+        puts '  tcf-platform show              # Show current configuration'
+        puts '  tcf-platform migrate           # Migrate configuration'
+        puts '  tcf-platform reset             # Reset configuration'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'
