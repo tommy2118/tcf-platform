@@ -64,7 +64,7 @@ RSpec.describe TcfPlatform::RepositoryCommands do
         cli.repos('status')
 
         aggregate_failures do
-          expect($stdout).to have_received(:puts).with(/\/Users\/tcaruso\/src\/tcf-gateway/)
+          expect($stdout).to have_received(:puts).with(%r{/Users/tcaruso/src/tcf-gateway})
           expect($stdout).to have_received(:puts).with(/Clean working directory/)
           expect($stdout).to have_received(:puts).with(/Latest commit/)
         end
@@ -110,12 +110,12 @@ RSpec.describe TcfPlatform::RepositoryCommands do
 
       it 'clones specific repositories when requested' do
         allow(repository_manager).to receive(:clone_missing_repositories).with(['tcf-personas']).and_return({
-          'tcf-personas' => {
-            status: 'cloned',
-            path: '/Users/tcaruso/src/tcf-personas',
-            url: 'git@github.com:tommy2118/tcf-personas.git'
-          }
-        })
+                                                                                                              'tcf-personas' => {
+                                                                                                                status: 'cloned',
+                                                                                                                path: '/Users/tcaruso/src/tcf-personas',
+                                                                                                                url: 'git@github.com:tommy2118/tcf-personas.git'
+                                                                                                              }
+                                                                                                            })
 
         cli.repos('clone', 'tcf-personas')
 
@@ -170,8 +170,8 @@ RSpec.describe TcfPlatform::RepositoryCommands do
 
       it 'updates specific repositories when requested' do
         allow(repository_manager).to receive(:update_repositories).with(['tcf-gateway']).and_return({
-          'tcf-gateway' => update_results['tcf-gateway']
-        })
+                                                                                                      'tcf-gateway' => update_results['tcf-gateway']
+                                                                                                    })
 
         cli.repos('update', 'tcf-gateway')
 
@@ -209,7 +209,8 @@ RSpec.describe TcfPlatform::RepositoryCommands do
 
       before do
         allow(build_coordinator).to receive(:build_services).and_return(build_results)
-        allow(build_coordinator).to receive(:calculate_build_order).and_return(%w[tcf-personas tcf-context tcf-tokens tcf-workflows tcf-projects tcf-gateway])
+        allow(build_coordinator).to receive(:calculate_build_order).and_return(%w[tcf-personas tcf-context tcf-tokens
+                                                                                  tcf-workflows tcf-projects tcf-gateway])
       end
 
       it 'builds all TCF services in dependency order' do
@@ -274,10 +275,10 @@ RSpec.describe TcfPlatform::RepositoryCommands do
         allow(cli).to receive(:options).and_return({ parallel: true })
         allow(build_coordinator).to receive(:parallel_build).and_return(parallel_build_results)
         allow(build_coordinator).to receive(:analyze_dependencies).and_return({
-          'tcf-personas' => [],
-          'tcf-context' => [],
-          'tcf-tokens' => []
-        })
+                                                                                'tcf-personas' => [],
+                                                                                'tcf-context' => [],
+                                                                                'tcf-tokens' => []
+                                                                              })
         allow(build_coordinator).to receive(:calculate_build_order).and_return(%w[tcf-personas tcf-context tcf-tokens])
         allow(build_coordinator).to receive(:build_services).and_return({})
       end

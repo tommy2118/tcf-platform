@@ -330,17 +330,17 @@ RSpec.describe TcfPlatform::BuildCoordinator do
   describe '#build_status' do
     before do
       allow(build_coordinator).to receive(:docker_images).and_return({
-                                                                           'tcf-gateway' => {
-                                                                             image_id: 'sha256:gateway123',
-                                                                             created: Time.now - 3600,
-                                                                             size_mb: 200.5
-                                                                           },
-                                                                           'tcf-personas' => {
-                                                                             image_id: 'sha256:personas456',
-                                                                             created: Time.now - 7200,
-                                                                             size_mb: 150.2
-                                                                           }
-                                                                         })
+                                                                       'tcf-gateway' => {
+                                                                         image_id: 'sha256:gateway123',
+                                                                         created: Time.now - 3600,
+                                                                         size_mb: 200.5
+                                                                       },
+                                                                       'tcf-personas' => {
+                                                                         image_id: 'sha256:personas456',
+                                                                         created: Time.now - 7200,
+                                                                         size_mb: 150.2
+                                                                       }
+                                                                     })
     end
 
     it 'provides comprehensive build status for all services' do
@@ -358,10 +358,10 @@ RSpec.describe TcfPlatform::BuildCoordinator do
 
     it 'identifies services without built images' do
       allow(build_coordinator).to receive(:docker_images).and_return({
-                                                                           'tcf-gateway' => {
-                                                                             image_id: 'sha256:gateway123', created: Time.now, size_mb: 200.5
-                                                                           }
-                                                                         })
+                                                                       'tcf-gateway' => {
+                                                                         image_id: 'sha256:gateway123', created: Time.now, size_mb: 200.5
+                                                                       }
+                                                                     })
 
       status = build_coordinator.build_status
 

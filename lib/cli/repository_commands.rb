@@ -35,7 +35,7 @@ module TcfPlatform
             repos_update(services.empty? ? nil : services)
           else
             puts "❌ Unknown subcommand: #{subcommand}"
-            puts "Available subcommands: status, clone, update"
+            puts 'Available subcommands: status, clone, update'
             exit 1
           end
         end
@@ -78,7 +78,8 @@ module TcfPlatform
               size_display = info[:size_mb] ? "#{info[:size_mb]} MB" : 'unknown'
               created_display = info[:created] ? info[:created].strftime('%b %d, %Y %H:%M') : 'unknown'
 
-              puts "✅ #{service_name.ljust(15)} Built    #{age_display.ljust(10)} #{size_display.ljust(10)} #{info[:image_id]&.slice(7, 12) || 'unknown'}"
+              image_display = info[:image_id]&.slice(7, 12) || 'unknown'
+              puts "✅ #{service_name.ljust(15)} Built    #{age_display.ljust(10)} #{size_display.ljust(10)} #{image_display}"
               puts "   📅 Created: #{created_display}"
             when 'not_built'
               puts "❌ #{service_name.ljust(15)} Not built"
@@ -88,7 +89,7 @@ module TcfPlatform
           puts
           puts '📋 Build status summary:'
           puts "   Built: #{built_count}/#{status_data.size} services"
-          puts "   Total size: #{total_size.round(1)} MB" if total_size > 0
+          puts "   Total size: #{total_size.round(1)} MB" if total_size.positive?
         end
       end
     end
@@ -226,7 +227,8 @@ module TcfPlatform
           total_time += result[:build_time] || 0.0
           total_size += result[:size_mb] || 0.0
 
-          puts "✅ #{service_name.ljust(15)} success   #{time_display.ljust(8)} #{size_display.ljust(8)} #{result[:image_id]&.slice(7, 12) || 'unknown'}"
+          image_display = result[:image_id]&.slice(7, 12) || 'unknown'
+          puts "✅ #{service_name.ljust(15)} success   #{time_display.ljust(8)} #{size_display.ljust(8)} #{image_display}"
         when 'failed'
           failed += 1
           puts "❌ #{service_name.ljust(15)} failed"
@@ -239,7 +241,7 @@ module TcfPlatform
       puts
       puts 'Build completed:'
       puts "   #{successful} successful, #{failed} failed"
-      puts "   Total time: #{total_time.round(1)}s, Total size: #{total_size.round(1)} MB" if total_time > 0
+      puts "   Total time: #{total_time.round(1)}s, Total size: #{total_size.round(1)} MB" if total_time.positive?
     end
 
     def build_parallel
