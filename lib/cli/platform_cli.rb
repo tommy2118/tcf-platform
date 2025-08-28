@@ -7,6 +7,7 @@ require_relative 'status_commands'
 require_relative 'config_commands'
 require_relative 'repository_commands'
 require_relative 'dev_commands'
+require_relative 'backup_commands'
 
 module TcfPlatform
   # Main CLI class for TCF Platform management
@@ -16,6 +17,7 @@ module TcfPlatform
     include ConfigCommands
     include RepositoryCommands
     include DevCommands
+    include BackupCommands
 
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
 
@@ -90,6 +92,13 @@ module TcfPlatform
         puts '  tcf-platform dev-migrate [SVC]  # Database migrations (--status, --rollback N)'
         puts '  tcf-platform dev-doctor         # Environment diagnostics (--quick, --verbose)'
         puts ''
+        puts 'Backup & Recovery Commands:'
+        puts '  tcf-platform backup-create ID   # Create backup (--incremental)'
+        puts '  tcf-platform backup-list        # List backups (--from DATE, --to DATE)'
+        puts '  tcf-platform backup-restore ID  # Restore backup (--components LIST, --force)'
+        puts '  tcf-platform backup-validate ID # Validate backup integrity'
+        puts '  tcf-platform backup-status      # Show backup system status'
+        puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'
       end
@@ -125,6 +134,14 @@ module TcfPlatform
     def build_server_command(port, host)
       config_ru = File.join(TcfPlatform.root, 'config.ru')
       "rackup #{config_ru} -p #{port} -o #{host}"
+    end
+
+    def platform_config
+      @platform_config ||= TcfPlatform::ConfigManager.load_environment
+    end
+
+    def docker_manager
+      @docker_manager ||= TcfPlatform::DockerManager.new
     end
   end
 end

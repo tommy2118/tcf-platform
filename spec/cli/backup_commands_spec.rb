@@ -14,7 +14,7 @@ RSpec.describe TcfPlatform::BackupCommands do
   before do
     allow(cli).to receive(:backup_manager).and_return(backup_manager)
     allow(cli).to receive(:recovery_manager).and_return(recovery_manager)
-    allow(cli).to receive(:config).and_return(config)
+    allow(cli).to receive(:platform_config).and_return(config)
   end
 
   describe '#backup_create' do

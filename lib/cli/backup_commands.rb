@@ -94,11 +94,11 @@ module TcfPlatform
       private
 
       def backup_manager
-        @backup_manager ||= BackupManager.new(config, docker_manager)
+        @backup_manager ||= BackupManager.new(platform_config, docker_manager)
       end
 
       def recovery_manager
-        @recovery_manager ||= RecoveryManager.new(backup_manager, config, docker_manager)
+        @recovery_manager ||= RecoveryManager.new(backup_manager, platform_config, docker_manager)
       end
 
       def display_backup_progress(result)
@@ -259,8 +259,8 @@ module TcfPlatform
       end
 
       # Abstract methods that should be implemented by the including class
-      def config
-        raise NotImplementedError, 'config method must be implemented by including class'
+      def platform_config
+        raise NotImplementedError, 'platform_config method must be implemented by including class'
       end
 
       def docker_manager
