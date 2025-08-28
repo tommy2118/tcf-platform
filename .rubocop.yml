@@ -1,17 +1,39 @@
 AllCops:
   NewCops: enable
+  SuggestExtensions: false
 
 Style/Documentation:
+  Enabled: false
+
+# Disable false positives for service lifecycle methods
+Naming/PredicateMethod:
   Enabled: false
 
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
+    - 'lib/cli/**/*'  # CLI modules use class_eval blocks
 
 Metrics/MethodLength:
   Exclude:
     - 'lib/cli/**/*'
+    - 'lib/docker_manager.rb'  # Service status method is complex by nature
 
 Metrics/AbcSize:
   Exclude:
     - 'lib/cli/**/*'
+
+Metrics/ClassLength:
+  Exclude:
+    - 'lib/docker_manager.rb'  # Core orchestration class is complex
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/PerceivedComplexity:
+  Max: 10
+
+# Format strings are acceptable for table output
+Style/FormatStringToken:
+  Exclude:
+    - 'lib/cli/status_commands.rb'

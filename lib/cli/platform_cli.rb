@@ -2,9 +2,15 @@
 
 require 'thor'
 require_relative '../tcf_platform'
+require_relative 'orchestration_commands'
+require_relative 'status_commands'
 
 module TcfPlatform
+  # Main CLI class for TCF Platform management
   class CLI < Thor
+    include OrchestrationCommands
+    include StatusCommands
+
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
 
     desc 'version', 'Display the version'
@@ -22,6 +28,9 @@ module TcfPlatform
         puts '  tcf-platform version           # Display the version'
         puts '  tcf-platform server            # Start the TCF Platform server'
         puts '  tcf-platform status            # Display application status'
+        puts '  tcf-platform up [SERVICE]      # Start TCF Platform services'
+        puts '  tcf-platform down              # Stop TCF Platform services'
+        puts '  tcf-platform restart [SERVICE] # Restart TCF Platform services'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'
@@ -53,45 +62,11 @@ module TcfPlatform
       exec(command)
     end
 
-    desc 'status', 'Display application status'
-    def status
-      puts 'TCF Platform Status'
-      puts '=' * 20
-      puts "Version: #{TcfPlatform.version}"
-      puts "Environment: #{TcfPlatform.env}"
-      puts "Root: #{TcfPlatform.root}"
-      puts ''
-
-      # Check if server is running
-      check_server_status
-    end
-
     private
 
     def build_server_command(port, host)
       config_ru = File.join(TcfPlatform.root, 'config.ru')
       "rackup #{config_ru} -p #{port} -o #{host}"
-    end
-
-    def check_server_status
-      require 'net/http'
-      require 'uri'
-
-      port = ENV.fetch('PORT', 3000)
-      uri = URI("http://localhost:#{port}/health")
-
-      begin
-        response = Net::HTTP.get_response(uri)
-        if response.code == '200'
-          puts "Server Status: Running on port #{port}"
-        else
-          puts "Server Status: Not responding properly (HTTP #{response.code})"
-        end
-      rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
-        puts "Server Status: Not running on port #{port}"
-      rescue StandardError => e
-        puts "Server Status: Unknown (#{e.message})"
-      end
     end
   end
 end

@@ -11,7 +11,11 @@
       "Bash(bundle exec bundle-audit check:*)",
       "Bash(bundle exec brakeman:*)",
       "Bash(git push:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh issue view:*)",
+      "Bash(timeout 30s bundle exec rspec)"
     ],
     "additionalDirectories": [
       "/Users/tcaruso/src/tcf-gateway"
