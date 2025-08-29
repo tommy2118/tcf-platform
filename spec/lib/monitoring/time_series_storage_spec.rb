@@ -26,6 +26,7 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
     end
 
     it 'validates Redis connectivity on initialization' do
+      storage # Force initialization
       expect(redis_client).to have_received(:ping)
     end
 

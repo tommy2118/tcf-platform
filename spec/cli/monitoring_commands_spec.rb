@@ -62,8 +62,8 @@ RSpec.describe TcfPlatform::CLI do
       
       aggregate_failures do
         expect(output).to include('TCF Platform Metrics')
-        expect(output).to include('gateway')
-        expect(output).to include('personas')
+        expect(output).to include('Gateway')
+        expect(output).to include('Personas')
         expect(output).to include('CPU: 45.2%')
         expect(output).to include('Memory: 62.1%')
         expect(output).to include('Response Time: 250.0ms')

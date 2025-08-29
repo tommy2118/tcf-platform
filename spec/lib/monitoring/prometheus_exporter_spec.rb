@@ -4,6 +4,24 @@ require 'spec_helper'
 require_relative '../../../lib/monitoring/prometheus_exporter'
 
 RSpec.describe TcfPlatform::Monitoring::PrometheusExporter do
+  # Stub Prometheus::Client::Registry for testing
+  before(:all) do
+    unless defined?(Prometheus::Client::Registry)
+      module Prometheus
+        module Client
+          Registry = Class.new do
+            attr_reader :metrics, :families
+            
+            def initialize
+              @metrics = []
+              @families = []
+            end
+          end
+        end
+      end
+    end
+  end
+  
   let(:exporter) { described_class.new }
   
   describe '#initialize' do

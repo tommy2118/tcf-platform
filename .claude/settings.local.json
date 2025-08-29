@@ -19,7 +19,8 @@
       "Bash(git rebase:*)",
       "Bash(gh issue list:*)",
       "Bash(ruby:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(timeout 30s bundle exec rspec spec/lib/monitoring/prometheus_exporter_spec.rb --format documentation)"
     ],
     "additionalDirectories": [
       "/Users/tcaruso/src/tcf-gateway"

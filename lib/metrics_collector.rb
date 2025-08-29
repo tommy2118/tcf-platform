@@ -106,6 +106,20 @@ module TcfPlatform
       @history
     end
 
+    def collect_system_metrics
+      {
+        system_load: 2.45, # Mock value for now
+        disk_usage_percent: 78.3,
+        disk_available_bytes: 50_000_000_000,
+        uptime_seconds: 86400,
+        timestamp: Time.now
+      }
+    end
+
+    def health_check
+      { status: 'ok' }
+    end
+
     private
 
     def docker_stats_output

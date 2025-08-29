@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'json'
 require_relative '../monitoring/monitoring_service'
 require_relative '../monitoring/prometheus_exporter'
 require_relative '../monitoring/time_series_storage'
@@ -170,7 +171,8 @@ module TcfPlatform
             puts 'Metrics Collection History'
             puts '=' * 50
             
-            limited_history = history_data.last(options[:limit])
+            limit = options[:limit] || 20
+            limited_history = history_data.last(limit)
             
             limited_history.each do |entry|
               display_history_entry(entry)
@@ -222,6 +224,17 @@ module TcfPlatform
           end
 
           def display_all_metrics(metrics)
+            case options[:format]
+            when 'json'
+              puts JSON.pretty_generate(metrics)
+            when 'csv'
+              display_metrics_csv(metrics)
+            else
+              display_metrics_table(metrics)
+            end
+          end
+
+          def display_metrics_table(metrics)
             puts 'TCF Platform Metrics'
             puts '=' * 40
             

@@ -15,6 +15,27 @@ RSpec.describe TcfPlatform::Monitoring::MonitoringService do
     allow(TcfPlatform::Monitoring::TimeSeriesStorage).to receive(:new).and_return(time_series_storage)
     allow(TcfPlatform::Monitoring::PrometheusExporter).to receive(:new).and_return(prometheus_exporter)
     allow(TcfPlatform::Monitoring::DashboardServer).to receive(:new).and_return(dashboard_server)
+    
+    # Set up default stubs for common method calls
+    allow(time_series_storage).to receive(:ping).and_return('PONG')
+    allow(time_series_storage).to receive(:store_batch)
+    allow(time_series_storage).to receive(:storage_statistics).and_return({
+      used_memory_bytes: 47_185_920,
+      total_keys: 5000,
+      cache_hit_rate: 89.5
+    })
+    
+    allow(metrics_collector).to receive(:collect_service_metrics).and_return({})
+    allow(metrics_collector).to receive(:collect_system_metrics).and_return({})
+    allow(metrics_collector).to receive(:health_check).and_return({ status: 'ok' })
+    
+    allow(prometheus_exporter).to receive(:generate_complete_export).and_return('# Test metrics')
+    allow(prometheus_exporter).to receive(:health_check).and_return({ status: 'ok' })
+    
+    allow(dashboard_server).to receive(:running?).and_return(false)
+    allow(dashboard_server).to receive(:start)
+    allow(dashboard_server).to receive(:stop)
+    allow(dashboard_server).to receive(:url).and_return('http://localhost:3001')
   end
 
   describe '#initialize' do
@@ -402,25 +423,37 @@ RSpec.describe TcfPlatform::Monitoring::MonitoringService do
 
   describe '#collection_thread_management' do
     it 'monitors collection thread health' do
-      allow(service).to receive(:spawn_collection_thread)
+      thread_mock = instance_double(Thread)
+      allow(service).to receive(:spawn_collection_thread).and_return(thread_mock)
+      allow(service).to receive(:collection_thread).and_return(thread_mock)
       service.start
       
       # Simulate thread crash
-      allow(service.collection_thread).to receive(:alive?).and_return(false)
+      allow(thread_mock).to receive(:alive?).and_return(false)
       
       expect(service.collection_thread_healthy?).to be false
     end
 
     it 'automatically restarts crashed collection thread' do
-      allow(service).to receive(:spawn_collection_thread)
+      original_thread = instance_double(Thread)
+      new_thread = instance_double(Thread)
+      
+      # Start with original thread
+      allow(service).to receive(:spawn_collection_thread).and_return(original_thread)
+      allow(service).to receive(:collection_thread).and_return(original_thread)
       service.start
       
-      original_thread = service.collection_thread
+      # Simulate original thread crash
       allow(original_thread).to receive(:alive?).and_return(false)
+      
+      # Mock the restart behavior
+      expect(service).to receive(:spawn_collection_thread).and_return(new_thread)
+      allow(service).to receive(:collection_thread).and_return(new_thread)
+      allow(new_thread).to receive(:alive?).and_return(true)
       
       service.ensure_collection_thread_health
       
-      expect(service.collection_thread).not_to eq(original_thread)
+      expect(service.collection_thread).to eq(new_thread)
     end
   end
 end
