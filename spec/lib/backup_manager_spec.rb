@@ -10,14 +10,14 @@ RSpec.describe TcfPlatform::BackupManager do
 
   before do
     allow(config).to receive(:repository_config).and_return({
-      'tcf-gateway' => { 'url' => 'git@github.com:tommy2118/tcf-gateway.git' },
-      'tcf-personas' => { 'url' => 'git@github.com:tommy2118/tcf-personas.git' }
-    })
+                                                              'tcf-gateway' => { 'url' => 'git@github.com:tommy2118/tcf-gateway.git' },
+                                                              'tcf-personas' => { 'url' => 'git@github.com:tommy2118/tcf-personas.git' }
+                                                            })
     allow(docker_manager).to receive(:service_status).and_return({
-      'postgres' => { status: 'running' },
-      'redis' => { status: 'running' },
-      'qdrant' => { status: 'running' }
-    })
+                                                                   'postgres' => { status: 'running' },
+                                                                   'redis' => { status: 'running' },
+                                                                   'qdrant' => { status: 'running' }
+                                                                 })
   end
 
   describe '#discover_backup_sources' do

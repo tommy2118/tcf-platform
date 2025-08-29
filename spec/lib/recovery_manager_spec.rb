@@ -16,7 +16,7 @@ RSpec.describe TcfPlatform::RecoveryManager do
         {
           backup_id: 'backup_20240827_120000',
           created_at: Time.parse('2024-08-27 12:00:00'),
-          size: 1024000,
+          size: 1_024_000,
           type: 'full',
           status: 'completed',
           components: { 'databases' => 5, 'redis' => 1, 'repositories' => 6 }
@@ -24,7 +24,7 @@ RSpec.describe TcfPlatform::RecoveryManager do
         {
           backup_id: 'backup_20240826_120000',
           created_at: Time.parse('2024-08-26 12:00:00'),
-          size: 512000,
+          size: 512_000,
           type: 'incremental',
           status: 'completed',
           components: { 'databases' => 5, 'redis' => 1 }
@@ -115,7 +115,7 @@ RSpec.describe TcfPlatform::RecoveryManager do
     end
 
     it 'supports selective component restoration' do
-      components = ['databases', 'redis']
+      components = %w[databases redis]
       allow(recovery_manager).to receive(:create_recovery_point).and_return('recovery_point_20240827_140000')
       allow(recovery_manager).to receive(:restore_databases).and_return({ status: 'restored', count: 5, duration: 45.2 })
       allow(recovery_manager).to receive(:restore_redis).and_return({ status: 'restored', duration: 8.1 })
@@ -132,13 +132,13 @@ RSpec.describe TcfPlatform::RecoveryManager do
       corrupted_backup_id = 'corrupted_backup'
       allow(recovery_manager).to receive(:load_backup_metadata).with(corrupted_backup_id).and_return(backup_metadata)
       allow(recovery_manager).to receive(:validate_backup_integrity).with(corrupted_backup_id).and_return(
-        valid: false, 
+        valid: false,
         errors: ['Checksum mismatch in databases component']
       )
 
-      expect {
+      expect do
         recovery_manager.restore_backup(corrupted_backup_id)
-      }.to raise_error(TcfPlatform::BackupCorruptedError, /Checksum mismatch/)
+      end.to raise_error(TcfPlatform::BackupCorruptedError, /Checksum mismatch/)
     end
 
     it 'creates recovery point before restoration' do
@@ -194,10 +194,10 @@ RSpec.describe TcfPlatform::RecoveryManager do
 
     it 'detects backup corruption and reports issues' do
       allow(recovery_manager).to receive(:check_backup_files_exist).with(backup_id).and_return(false)
-      allow(recovery_manager).to receive(:verify_backup_checksums).with(backup_id).and_return({ 
-        valid: false, 
-        errors: ['Checksum mismatch in databases/tcf_personas.sql'] 
-      })
+      allow(recovery_manager).to receive(:verify_backup_checksums).with(backup_id).and_return({
+                                                                                                valid: false,
+                                                                                                errors: ['Checksum mismatch in databases/tcf_personas.sql']
+                                                                                              })
       allow(recovery_manager).to receive(:validate_backup_metadata).with(backup_id).and_return({ valid: true, errors: [] })
 
       result = recovery_manager.validate_backup(backup_id)

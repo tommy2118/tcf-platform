@@ -23,14 +23,14 @@ RSpec.describe TcfPlatform::BackupCommands do
       {
         backup_id: backup_id,
         status: 'completed',
-        size: 1048576,
+        size: 1_048_576,
         duration: 45.2,
         components: {
           'databases' => { status: 'completed', count: 5 },
-          'redis' => { status: 'completed', size: 524288 },
-          'qdrant' => { status: 'completed', size: 2097152 },
+          'redis' => { status: 'completed', size: 524_288 },
+          'qdrant' => { status: 'completed', size: 2_097_152 },
           'repositories' => { status: 'completed', count: 6 },
-          'configuration' => { status: 'completed', size: 262144 }
+          'configuration' => { status: 'completed', size: 262_144 }
         }
       }
     end
@@ -96,14 +96,14 @@ RSpec.describe TcfPlatform::BackupCommands do
         {
           backup_id: 'backup_20240827_120000',
           created_at: Time.parse('2024-08-27 12:00:00'),
-          size: 1048576,
+          size: 1_048_576,
           type: 'full',
           status: 'completed'
         },
         {
           backup_id: 'backup_20240826_180000',
           created_at: Time.parse('2024-08-26 18:00:00'),
-          size: 524288,
+          size: 524_288,
           type: 'incremental',
           status: 'completed'
         }
@@ -128,7 +128,7 @@ RSpec.describe TcfPlatform::BackupCommands do
       from_date = Date.parse('2024-08-27')
       to_date = Date.parse('2024-08-27')
       filtered_backups = [sample_backups.first]
-      
+
       allow(recovery_manager).to receive(:list_available_backups)
         .with(from: from_date, to: to_date)
         .and_return(filtered_backups)
@@ -181,10 +181,10 @@ RSpec.describe TcfPlatform::BackupCommands do
     end
 
     it 'supports selective component restoration' do
-      components = ['databases', 'redis']
+      components = %w[databases redis]
       allow(cli).to receive(:yes?).and_return(true)
       allow(recovery_manager).to receive(:restore_backup).with(backup_id, components: components).and_return(
-        restore_result.merge(components_restored: restore_result[:components_restored].select { |k, _| components.include?(k) })
+        restore_result.merge(components_restored: restore_result[:components_restored].slice(*components))
       )
 
       output = capture_stdout { cli.backup_restore(backup_id, components: components.join(',')) }
@@ -197,7 +197,7 @@ RSpec.describe TcfPlatform::BackupCommands do
 
     it 'aborts when user declines confirmation' do
       allow(cli).to receive(:yes?).and_return(false)
-      allow(recovery_manager).to receive(:restore_backup)  # Create stub for verification
+      allow(recovery_manager).to receive(:restore_backup) # Create stub for verification
 
       output = capture_stdout { cli.backup_restore(backup_id) }
 
@@ -278,15 +278,15 @@ RSpec.describe TcfPlatform::BackupCommands do
   describe '#backup_status' do
     it 'shows backup system status and statistics' do
       allow(backup_manager).to receive(:discover_backup_sources).and_return({
-        databases: { 'tcf_personas' => { size: 1048576 } },
-        redis: { size: 524288 },
-        repositories: { 'tcf-gateway' => { size: 262144 } }
-      })
-      allow(backup_manager).to receive(:estimated_backup_size).and_return(1835008)
+                                                                              databases: { 'tcf_personas' => { size: 1_048_576 } },
+                                                                              redis: { size: 524_288 },
+                                                                              repositories: { 'tcf-gateway' => { size: 262_144 } }
+                                                                            })
+      allow(backup_manager).to receive(:estimated_backup_size).and_return(1_835_008)
       allow(recovery_manager).to receive(:list_available_backups).and_return([
-        { backup_id: 'backup_1', status: 'completed', size: 1048576 },
-        { backup_id: 'backup_2', status: 'completed', size: 524288 }
-      ])
+                                                                               { backup_id: 'backup_1', status: 'completed', size: 1_048_576 },
+                                                                               { backup_id: 'backup_2', status: 'completed', size: 524_288 }
+                                                                             ])
 
       output = capture_stdout { cli.backup_status }
 
