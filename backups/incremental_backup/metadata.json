@@ -1,0 +1,41 @@
+{
+  "backup_id": "incremental_backup",
+  "type": "incremental",
+  "status": "completed",
+  "components": {
+    "databases": {
+      "status": "completed",
+      "count": 5,
+      "duration": 15.0,
+      "type": "incremental"
+    },
+    "redis": {
+      "status": "completed",
+      "size": 512,
+      "duration": 3.0,
+      "type": "incremental"
+    },
+    "qdrant": {
+      "status": "completed",
+      "size": 1024,
+      "duration": 5.0,
+      "type": "incremental"
+    },
+    "repositories": {
+      "status": "completed",
+      "count": 6,
+      "duration": 8.0,
+      "type": "incremental"
+    },
+    "configuration": {
+      "status": "completed",
+      "size": 256,
+      "duration": 1.0,
+      "type": "incremental"
+    }
+  },
+  "created_at": "2025-08-28 18:19:53 -0400",
+  "base_backup": "base_backup",
+  "size": 852,
+  "duration": 0.000083
+}
