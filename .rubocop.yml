@@ -67,6 +67,7 @@ Metrics/ClassLength:
     - 'lib/migration_manager.rb'  # Database migration management is inherently complex
     - 'lib/backup_manager.rb'  # Backup orchestration class requires comprehensive component coordination
     - 'lib/recovery_manager.rb'  # Recovery management class requires extensive validation and restoration logic
+    - 'lib/cli/platform_cli.rb'  # Main CLI class integrates all command modules and help system
 
 Metrics/ModuleLength:
   Exclude:
