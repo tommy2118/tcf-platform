@@ -259,6 +259,7 @@ RSpec.describe TcfPlatform::CLI do
 
     context 'when start fails' do
       before do
+        allow(monitoring_service).to receive(:running?).and_return(false)
         allow(monitoring_service).to receive(:start).and_raise(StandardError, 'Failed to start')
       end
 

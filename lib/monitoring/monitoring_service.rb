@@ -337,6 +337,13 @@ module TcfPlatform
       def storage_statistics
         @time_series_storage.storage_statistics
       end
+
+      def dashboard_url
+        return nil unless @dashboard_server&.running?
+        
+        port = @config[:dashboard_port] || 3001
+        "http://localhost:#{port}"
+      end
     end
   end
 end

@@ -38,7 +38,10 @@ module TcfPlatform
             prometheus_exporter = TcfPlatform::Monitoring::PrometheusExporter.new
 
             begin
-              prometheus_output = prometheus_exporter.generate_complete_export
+              # Collect current metrics to export
+              metrics_collector = TcfPlatform::MetricsCollector.new
+              current_metrics = metrics_collector.collect_service_metrics
+              prometheus_output = prometheus_exporter.generate_complete_export(current_metrics)
 
               if options[:output]
                 File.write(options[:output], prometheus_output)

@@ -107,14 +107,15 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
     end
 
     it 'stores multiple metrics in a single Redis transaction' do
-      allow(redis_client).to receive(:multi).and_yield
-      allow(redis_client).to receive(:setex)
-      allow(redis_client).to receive(:zadd)
+      transaction_mock = instance_double('Redis::Transaction')
+      allow(transaction_mock).to receive(:setex)
+      allow(transaction_mock).to receive(:zadd)
+      allow(redis_client).to receive(:multi).and_yield(transaction_mock)
       
       storage.store_batch(batch_metrics)
       
       expect(redis_client).to have_received(:multi)
-      expect(redis_client).to have_received(:setex).exactly(3).times
+      expect(transaction_mock).to have_received(:setex).exactly(3).times
     end
 
     it 'improves performance for large metric batches' do
