@@ -182,5 +182,43 @@ module TcfPlatform
     rescue StandardError
       'unknown'
     end
+
+    def service_stats(service_name = nil)
+      if service_name
+        get_service_stats(service_name)
+      else
+        get_all_services_stats
+      end
+    end
+
+    private
+
+    def get_service_stats(service_name)
+      output = execute_command("docker stats #{service_name} --no-stream --format 'table {{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}'")
+      parse_stats_output(output, service_name)
+    rescue StandardError => e
+      { error: e.message, service: service_name }
+    end
+
+    def get_all_services_stats
+      services = TcfPlatform::ServiceRegistry.tcf_services
+      services.each_with_object({}) do |service, stats|
+        stats[service] = get_service_stats(service)
+      end
+    end
+
+    def parse_stats_output(output, service_name)
+      lines = output.strip.split("\n")
+      return { error: "No stats found", service: service_name } if lines.length < 2
+
+      data_line = lines[1].split("\t")
+      {
+        service: service_name,
+        cpu_percent: data_line[0]&.gsub('%', '')&.to_f || 0.0,
+        memory_usage: data_line[1] || '0B / 0B',
+        network_io: data_line[2] || '0B / 0B',
+        block_io: data_line[3] || '0B / 0B'
+      }
+    end
   end
 end

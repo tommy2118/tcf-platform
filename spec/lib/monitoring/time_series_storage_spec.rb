@@ -10,6 +10,10 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
   before do
     allow(Redis).to receive(:new).and_return(redis_client)
     allow(redis_client).to receive(:ping).and_return('PONG')
+    allow(redis_client).to receive(:setex)
+    allow(redis_client).to receive(:zadd)
+    allow(redis_client).to receive(:zrangebyscore).and_return([])
+    allow(redis_client).to receive(:mget).and_return([])
   end
 
   describe '#initialize' do
@@ -123,9 +127,10 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
         { service: 'service', metric: 'test', value: i, timestamp: Time.now.to_i + i }
       }
       
-      allow(redis_client).to receive(:multi).and_yield
-      allow(redis_client).to receive(:setex)
-      allow(redis_client).to receive(:zadd)
+      transaction_mock = instance_double('Redis::Transaction')
+      allow(transaction_mock).to receive(:setex)
+      allow(transaction_mock).to receive(:zadd)
+      allow(redis_client).to receive(:multi).and_yield(transaction_mock)
       
       start_time = Time.now
       storage.store_batch(large_batch)
