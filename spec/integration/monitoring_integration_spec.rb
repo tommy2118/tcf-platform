@@ -9,8 +9,14 @@ RSpec.describe 'TCF Platform Monitoring Integration', type: :integration do
   let(:cli) { TcfPlatform::CLI.new }
 
   before(:all) do
+    # Skip integration tests if Docker isn't available or in CI
+    skip 'Docker not available' unless system('which docker > /dev/null 2>&1')
+    skip 'Integration tests disabled in CI' if ENV['CI']
+    
     # Ensure Docker services are running for integration tests
-    system('docker-compose up -d redis postgres')
+    unless system('docker-compose up -d redis postgres')
+      skip 'Unable to start required Docker services'
+    end
     sleep 5 # Allow services to start
   end
 
