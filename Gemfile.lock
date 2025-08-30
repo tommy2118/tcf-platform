@@ -74,6 +74,7 @@ GEM
     net-http (0.6.0)
       uri
     nio4r (2.7.4)
+    ostruct (0.6.3)
     parallel (1.27.0)
     parser (3.3.9.0)
       ast (~> 2.4.1)
@@ -184,6 +185,7 @@ GEM
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
+    webrick (1.9.1)
 
 PLATFORMS
   aarch64-linux-gnu
@@ -210,6 +212,7 @@ DEPENDENCIES
   faraday-retry
   jwt (~> 2.7)
   multi_json
+  ostruct
   pg (~> 1.5)
   puma (~> 6.0)
   rack-cors
@@ -227,6 +230,7 @@ DEPENDENCIES
   thor (~> 1.3)
   timecop
   webmock
+  webrick
 
 RUBY VERSION
    ruby 3.4.1p0
