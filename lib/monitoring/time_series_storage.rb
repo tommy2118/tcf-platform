@@ -41,7 +41,7 @@ module TcfPlatform
 
         begin
           @redis.setex(key, @default_ttl, value)
-          
+
           # Add to time-series index for efficient querying
           add_to_time_series_index(metric_data)
         rescue Redis::BaseError => e
@@ -56,10 +56,10 @@ module TcfPlatform
           @redis.multi do |transaction|
             metrics_batch.each do |metric_data|
               validate_metric_data!(metric_data)
-              
+
               key = build_metric_key(metric_data)
               value = metric_data.to_json
-              
+
               transaction.setex(key, @default_ttl, value)
               transaction.zadd(
                 build_index_key(metric_data),
@@ -108,17 +108,17 @@ module TcfPlatform
         # Apply aggregation function to each bucket
         buckets.map do |bucket_timestamp, values|
           aggregated_value = case aggregation_type
-                           when 'avg'
-                             values.sum { |v| v[:value] } / values.size.to_f
-                           when 'min'
-                             values.map { |v| v[:value] }.min
-                           when 'max'
-                             values.map { |v| v[:value] }.max
-                           when 'sum'
-                             values.sum { |v| v[:value] }
-                           else
-                             raise ArgumentError, "Unsupported aggregation: #{aggregation_type}"
-                           end
+                             when 'avg'
+                               values.sum { |v| v[:value] } / values.size.to_f
+                             when 'min'
+                               values.map { |v| v[:value] }.min
+                             when 'max'
+                               values.map { |v| v[:value] }.max
+                             when 'sum'
+                               values.sum { |v| v[:value] }
+                             else
+                               raise ArgumentError, "Unsupported aggregation: #{aggregation_type}"
+                             end
 
           {
             timestamp: bucket_timestamp,
@@ -137,7 +137,7 @@ module TcfPlatform
         @redis.scan_each(match: 'metrics:*') do |key|
           scanned_keys += 1
           ttl = @redis.ttl(key)
-          
+
           if ttl == -1 # Key has no expiration (expired)
             expired_keys += 1
             unless dry_run
@@ -160,13 +160,13 @@ module TcfPlatform
       def storage_statistics
         info = @redis.info
 
-        used_memory = info['used_memory']&.to_i || 0
-        connected_clients = info['connected_clients']&.to_i || 0
-        keyspace_hits = info['keyspace_hits']&.to_i || 0
-        keyspace_misses = info['keyspace_misses']&.to_i || 0
-        
+        used_memory = info['used_memory'].to_i
+        connected_clients = info['connected_clients'].to_i
+        keyspace_hits = info['keyspace_hits'].to_i
+        keyspace_misses = info['keyspace_misses'].to_i
+
         total_operations = keyspace_hits + keyspace_misses
-        hit_rate = total_operations > 0 ? (keyspace_hits.to_f / total_operations * 100).round(2) : 0.0
+        hit_rate = total_operations.positive? ? (keyspace_hits.to_f / total_operations * 100).round(2) : 0.0
 
         {
           used_memory_bytes: used_memory,
@@ -176,7 +176,7 @@ module TcfPlatform
         }
       end
 
-      def backup_storage(backup_path)
+      def backup_storage(_backup_path)
         # Trigger background save
         @redis.bgsave
 
@@ -188,14 +188,12 @@ module TcfPlatform
         loop do
           sleep 1
           current_save_time = @redis.lastsave
-          
+
           # Backup completed if lastsave timestamp changed
           break if current_save_time > last_save_before
-          
+
           # Timeout protection
-          if Time.now - start_time > max_wait
-            raise StorageError, "Backup failed to complete within #{max_wait} seconds"
-          end
+          raise StorageError, "Backup failed to complete within #{max_wait} seconds" if Time.now - start_time > max_wait
         end
 
         # In a real implementation, you'd copy the RDB file to backup_path
@@ -207,16 +205,16 @@ module TcfPlatform
       def validate_metric_data!(metric_data)
         required_fields = %i[service metric value timestamp]
         missing_fields = required_fields - metric_data.keys
-        
-        unless missing_fields.empty?
-          raise ArgumentError, "Missing required field(s): #{missing_fields.join(', ')}"
-        end
+
+        return if missing_fields.empty?
+
+        raise ArgumentError, "Missing required field(s): #{missing_fields.join(', ')}"
       end
 
       def validate_query_params!(params)
-        if params[:start_time] >= params[:end_time]
-          raise ArgumentError, "Start time must be before end time"
-        end
+        return unless params[:start_time] >= params[:end_time]
+
+        raise ArgumentError, 'Start time must be before end time'
       end
 
       def build_metric_key(metric_data)
@@ -236,20 +234,20 @@ module TcfPlatform
       def add_to_time_series_index(metric_data)
         index_key = build_index_key(metric_data)
         timestamp = metric_data[:timestamp]
-        
+
         @redis.zadd(index_key, timestamp, timestamp)
       end
 
       def group_by_time_buckets(raw_data, resolution_seconds)
         buckets = {}
-        
+
         raw_data.each do |data_point|
           # Round timestamp down to nearest resolution boundary
           bucket_timestamp = (data_point[:timestamp] / resolution_seconds) * resolution_seconds
           buckets[bucket_timestamp] ||= []
           buckets[bucket_timestamp] << data_point
         end
-        
+
         buckets
       end
 

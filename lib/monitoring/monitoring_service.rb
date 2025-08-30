@@ -12,6 +12,7 @@ module TcfPlatform
   module Monitoring
     # Custom error classes for monitoring system
     class ServiceStartupError < StandardError; end
+
     class CollectionError < StandardError
       attr_reader :retry_count, :original_error
 
@@ -21,6 +22,7 @@ module TcfPlatform
         @original_error = original_error
       end
     end
+
     class StorageConnectionError < StandardError; end
     class StorageError < StandardError; end
     class ExportError < StandardError; end
@@ -65,7 +67,7 @@ module TcfPlatform
         collection_timeout: 10
       }.freeze
 
-      attr_reader :config, :collection_interval, :dashboard_port, :start_time
+      attr_reader :config, :collection_interval, :dashboard_port, :start_time, :collection_thread
 
       def initialize(config = {})
         @config = DEFAULT_CONFIG.merge(config)
@@ -137,7 +139,6 @@ module TcfPlatform
 
           # Update collection statistics
           update_collection_stats(metrics_batch.size, collection_start)
-
         rescue StandardError => e
           @collection_stats[:errors_count] += 1
           logger.error("Metrics collection failed: #{e.message}")
@@ -171,21 +172,19 @@ module TcfPlatform
       end
 
       def prometheus_metrics
-        begin
-          current_metrics = collect_current_metrics
-          prometheus_output = @prometheus_exporter.generate_complete_export(current_metrics)
+        current_metrics = collect_current_metrics
+        prometheus_output = @prometheus_exporter.generate_complete_export(current_metrics)
 
-          {
-            status: 200,
-            content_type: 'text/plain; version=0.0.4; charset=utf-8',
-            body: prometheus_output
-          }
-        rescue StandardError => e
-          {
-            status: 500,
-            body: "# Error generating metrics: #{e.message}"
-          }
-        end
+        {
+          status: 200,
+          content_type: 'text/plain; version=0.0.4; charset=utf-8',
+          body: prometheus_output
+        }
+      rescue StandardError => e
+        {
+          status: 500,
+          body: "# Error generating metrics: #{e.message}"
+        }
       end
 
       def health_check
@@ -236,6 +235,7 @@ module TcfPlatform
 
       def collection_thread_healthy?
         return false unless @collection_thread
+
         @collection_thread.respond_to?(:alive?) ? @collection_thread.alive? : false
       end
 
@@ -243,23 +243,19 @@ module TcfPlatform
         return if collection_thread_healthy?
 
         old_thread = @collection_thread
-        @collection_thread&.kill if @collection_thread&.respond_to?(:kill)
+        @collection_thread&.kill if @collection_thread.respond_to?(:kill)
         spawn_collection_thread
-        
+
         # If spawn_collection_thread was stubbed and didn't create a new thread,
         # create one for testing purposes
-        if @collection_thread == old_thread || @collection_thread.nil?
-          @collection_thread = Thread.new do
-            loop do
-              sleep 0.1
-              break unless @running # Allow thread to exit when service stops
-            end
+        return unless @collection_thread == old_thread || @collection_thread.nil?
+
+        @collection_thread = Thread.new do
+          loop do
+            sleep 0.1
+            break unless @running # Allow thread to exit when service stops
           end
         end
-      end
-
-      def collection_thread
-        @collection_thread
       end
 
       private
@@ -279,6 +275,7 @@ module TcfPlatform
 
       def uptime
         return 0 unless @start_time
+
         Time.now - @start_time
       end
 

@@ -23,7 +23,7 @@ module TcfPlatform
         @collection_timeout = @config[:collection_timeout]
         @retry_attempts = @config[:retry_attempts]
         @metrics_cache_ttl = @config[:metrics_cache_ttl]
-        
+
         @docker_manager = DockerManager.new
         @service_registry = ServiceRegistry.new
         @metrics_cache = {}
@@ -34,7 +34,7 @@ module TcfPlatform
         return cached_metrics if !bypass_cache && cache_valid?
 
         collection_start = Time.now
-        
+
         begin
           # Get service status and Docker stats
           service_status = @service_registry.all_services
@@ -50,25 +50,22 @@ module TcfPlatform
           # Cache the results
           cache_metrics(metrics)
           metrics
-
         rescue StandardError => e
-          raise CollectionError.new("Failed to collect comprehensive metrics: #{e.message}")
+          raise CollectionError, "Failed to collect comprehensive metrics: #{e.message}"
         end
       end
 
       def collect_application_metrics(service_name)
-        begin
-          service_metrics = fetch_service_metrics(service_name, '/metrics')
-          
-          # Transform service-specific metrics
-          {
-            http_requests_total: service_metrics['http_requests_total'],
-            avg_response_time_seconds: service_metrics['http_request_duration_seconds_avg'],
-            active_connections: service_metrics['active_connections']
-          }
-        rescue Net::HTTPError, StandardError
-          { custom_metrics_available: false }
-        end
+        service_metrics = fetch_service_metrics(service_name, '/metrics')
+
+        # Transform service-specific metrics
+        {
+          http_requests_total: service_metrics['http_requests_total'],
+          avg_response_time_seconds: service_metrics['http_request_duration_seconds_avg'],
+          active_connections: service_metrics['active_connections']
+        }
+      rescue Net::HTTPError, Timeout::Error
+        { custom_metrics_available: false }
       end
 
       def collect_with_retries(&block)
@@ -92,10 +89,10 @@ module TcfPlatform
         raise error
       end
 
-      def collect_historical_trends(service, metric, time_window_seconds)
+      def collect_historical_trends(service, metric, _time_window_seconds)
         history_data = metrics_history
         service_data = history_data.select { |h| h[:services]&.dig(service.to_sym, metric.to_sym) }
-        
+
         return {} if service_data.empty?
 
         values = service_data.map { |h| h[:services][service.to_sym][metric.to_sym] }
@@ -109,41 +106,41 @@ module TcfPlatform
         }
       end
 
-      def detect_metric_anomalies(service, metric, time_window_seconds)
+      def detect_metric_anomalies(service, metric, _time_window_seconds)
         history_data = metrics_history
         service_data = history_data.select { |h| h[:services]&.dig(service.to_sym, metric.to_sym) }
-        
+
         return [] if service_data.size < 3
 
         values = service_data.map { |h| h[:services][service.to_sym][metric.to_sym] }
         mean = values.sum / values.size.to_f
-        std_dev = Math.sqrt(values.map { |v| (v - mean) ** 2 }.sum / values.size)
-        
+        std_dev = Math.sqrt(values.map { |v| (v - mean)**2 }.sum / values.size)
+
         anomalies = []
         service_data.each_with_index do |data, index|
           value = values[index]
-          z_score = std_dev > 0 ? (value - mean) / std_dev : 0
-          
-          if z_score.abs > 2.0 # Anomaly threshold
-            anomalies << {
-              timestamp: data[:timestamp],
-              value: value,
-              anomaly_score: z_score.abs / 2.0
-            }
-          end
+          z_score = std_dev.positive? ? (value - mean) / std_dev : 0
+
+          next unless z_score.abs > 2.0 # Anomaly threshold
+
+          anomalies << {
+            timestamp: data[:timestamp],
+            value: value,
+            anomaly_score: z_score.abs / 2.0
+          }
         end
 
         anomalies
       end
 
-      def calculate_service_health_score(service_name, metrics)
+      def calculate_service_health_score(_service_name, metrics)
         component_scores = {}
-        
+
         # CPU score (0-100, lower is better)
         cpu_score = [100 - metrics[:cpu_percent], 0].max
         component_scores[:cpu] = cpu_score
 
-        # Memory score  
+        # Memory score
         memory_score = [100 - metrics[:memory_percent], 0].max
         component_scores[:memory] = memory_score
 
@@ -157,10 +154,10 @@ module TcfPlatform
 
         # Calculate overall weighted score
         overall_score = (
-          component_scores[:cpu] * 0.3 +
-          component_scores[:memory] * 0.3 +
-          component_scores[:response_time] * 0.2 +
-          component_scores[:error_rate] * 0.2
+          (component_scores[:cpu] * 0.3) +
+          (component_scores[:memory] * 0.3) +
+          (component_scores[:response_time] * 0.2) +
+          (component_scores[:error_rate] * 0.2)
         ).round(1)
 
         {
@@ -174,15 +171,15 @@ module TcfPlatform
         overall_score = health_score_data[:overall_score]
 
         health_status = case overall_score
-                       when 80..100
-                         'excellent'
-                       when 60..79
-                         'good'
-                       when 40..59
-                         'warning'
-                       else
-                         'critical'
-                       end
+                        when 80..100
+                          'excellent'
+                        when 60..79
+                          'good'
+                        when 40..59
+                          'warning'
+                        else
+                          'critical'
+                        end
 
         at_risk_factors = []
         recommendations = []
@@ -224,9 +221,7 @@ module TcfPlatform
         batch = []
 
         # Validate structure
-        unless metrics_data.is_a?(Hash) && metrics_data[:services]
-          raise ExportError, "Invalid metrics data structure"
-        end
+        raise ExportError, 'Invalid metrics data structure' unless metrics_data.is_a?(Hash) && metrics_data[:services]
 
         # Process services metrics
         metrics_data[:services].each do |service, service_metrics|
@@ -243,17 +238,15 @@ module TcfPlatform
         end
 
         # Process system metrics
-        if metrics_data[:system]
-          metrics_data[:system].each do |metric_name, value|
-            next if metric_name == :timestamp
+        metrics_data[:system]&.each do |metric_name, value|
+          next if metric_name == :timestamp
 
-            batch << {
-              service: 'system',
-              metric: metric_name.to_s,
-              value: value,
-              timestamp: Time.now.to_i
-            }
-          end
+          batch << {
+            service: 'system',
+            metric: metric_name.to_s,
+            value: value,
+            timestamp: Time.now.to_i
+          }
         end
 
         batch
@@ -267,7 +260,7 @@ module TcfPlatform
         service_status.each do |service_name, status|
           service_key = normalize_service_name(service_name)
           container_key = find_container_for_service(service_name, docker_stats.keys)
-          
+
           services[service_key] = {
             health_status: status[:health] || 'unknown'
           }
@@ -294,7 +287,7 @@ module TcfPlatform
       def build_collection_metadata(start_time, service_status)
         duration_ms = ((Time.now - start_time) * 1000).round(2)
         healthy_count = service_status.count { |_, status| status[:health] == 'healthy' }
-        
+
         {
           collection_timestamp: start_time,
           collection_duration_ms: duration_ms,
@@ -307,7 +300,7 @@ module TcfPlatform
 
       def cache_valid?
         return false if @metrics_cache.empty?
-        
+
         cache_age = Time.now - (@cache_timestamps[:last_update] || Time.at(0))
         cache_age < @metrics_cache_ttl
       end
@@ -354,7 +347,7 @@ module TcfPlatform
         # Parse "128.5MiB / 1.952GiB" format
         parts = mem_str.split(' / ')
         used_part = parts.first
-        
+
         if used_part.include?('MiB')
           used_part.gsub('MiB', '').to_f
         elsif used_part.include?('GiB')
@@ -373,7 +366,7 @@ module TcfPlatform
       end
 
       def parse_disk_io(blockio_str)
-        # Parse "4.56MB / 1.23MB" format  
+        # Parse "4.56MB / 1.23MB" format
         parts = blockio_str.split(' / ')
         read = parse_bytes(parts[0])
         write = parse_bytes(parts[1])
@@ -385,13 +378,13 @@ module TcfPlatform
 
         case byte_str
         when /(\d+\.?\d*)\s*GB/
-          ($1.to_f * 1_000_000_000).to_i
+          (::Regexp.last_match(1).to_f * 1_000_000_000).to_i
         when /(\d+\.?\d*)\s*MB/
-          ($1.to_f * 1_000_000).to_i
+          (::Regexp.last_match(1).to_f * 1_000_000).to_i
         when /(\d+\.?\d*)\s*kB/
-          ($1.to_f * 1000).to_i
+          (::Regexp.last_match(1).to_f * 1000).to_i
         when /(\d+\.?\d*)\s*B/
-          $1.to_i
+          ::Regexp.last_match(1).to_i
         else
           0
         end
@@ -420,10 +413,10 @@ module TcfPlatform
         }
       end
 
-      def fetch_service_metrics(service_name, endpoint)
+      def fetch_service_metrics(_service_name, _endpoint)
         # Mock implementation for testing
         {
-          'http_requests_total' => 15432,
+          'http_requests_total' => 15_432,
           'http_request_duration_seconds_avg' => 0.145,
           'active_connections' => 25
         }
@@ -439,11 +432,11 @@ module TcfPlatform
 
         increases = 0
         decreases = 0
-        
+
         (1...values.size).each do |i|
-          if values[i] > values[i-1]
+          if values[i] > values[i - 1]
             increases += 1
-          elsif values[i] < values[i-1]
+          elsif values[i] < values[i - 1]
             decreases += 1
           end
         end
@@ -462,15 +455,15 @@ module TcfPlatform
 
         total_change = values.last - values.first
         time_span_minutes = (timestamps.last - timestamps.first) / 60.0
-        
-        time_span_minutes > 0 ? total_change / time_span_minutes : 0.0
+
+        time_span_minutes.positive? ? total_change / time_span_minutes : 0.0
       end
 
       def calculate_volatility(values)
         return 0.0 if values.size < 2
 
         mean = values.sum / values.size.to_f
-        variance = values.sum { |v| (v - mean) ** 2 } / values.size.to_f
+        variance = values.sum { |v| (v - mean)**2 } / values.size.to_f
         Math.sqrt(variance) / mean
       end
 
@@ -480,16 +473,15 @@ module TcfPlatform
         # Simple linear extrapolation
         recent_values = values.last(5) # Use last 5 points
         trend = calculate_simple_trend(recent_values)
-        
+
         values.last + (trend * minutes_ahead)
       end
 
       def calculate_simple_trend(values)
         return 0.0 if values.size < 2
 
-        changes = []
-        (1...values.size).each do |i|
-          changes << values[i] - values[i-1]
+        changes = (1...values.size).map do |i|
+          (values[i] - values[i - 1])
         end
 
         changes.sum / changes.size.to_f

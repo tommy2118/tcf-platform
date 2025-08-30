@@ -17,10 +17,10 @@ module TcfPlatform
           option :refresh, type: :boolean, default: false, desc: 'Auto-refresh display'
           def metrics_show(service = nil)
             metrics_collector = TcfPlatform::MetricsCollector.new
-            
+
             begin
               current_metrics = metrics_collector.collect_service_metrics
-              
+
               if service
                 display_service_metrics(service, current_metrics)
               else
@@ -36,10 +36,10 @@ module TcfPlatform
           option :output, type: :string, desc: 'Output file path'
           def metrics_export
             prometheus_exporter = TcfPlatform::Monitoring::PrometheusExporter.new
-            
+
             begin
               prometheus_output = prometheus_exporter.generate_complete_export
-              
+
               if options[:output]
                 File.write(options[:output], prometheus_output)
                 puts "Metrics exported to #{options[:output]}"
@@ -59,10 +59,10 @@ module TcfPlatform
           option :resolution, type: :numeric, default: 300, desc: 'Time resolution in seconds'
           def metrics_query(service, metric)
             time_series_storage = TcfPlatform::Monitoring::TimeSeriesStorage.new
-            
+
             query_params = build_query_params(service, metric)
             result = time_series_storage.query_metrics(query_params)
-            
+
             if result.empty?
               puts 'No data found for the specified query'
             else
@@ -75,17 +75,17 @@ module TcfPlatform
           option :background, type: :boolean, default: true, desc: 'Run in background'
           def monitor_start
             monitoring_service = TcfPlatform::Monitoring::MonitoringService.new
-            
+
             if monitoring_service.running?
               puts 'Monitoring system is already running'
               return
             end
 
             puts '📊 Starting monitoring system...'
-            
+
             begin
               monitoring_service.start
-              
+
               if monitoring_service.running?
                 if options[:background]
                   puts '✅ Monitoring system started successfully in background mode'
@@ -103,20 +103,20 @@ module TcfPlatform
           desc 'monitor-stop', 'Stop monitoring system'
           def monitor_stop
             monitoring_service = TcfPlatform::Monitoring::MonitoringService.new
-            
-            if !monitoring_service.running?
+
+            unless monitoring_service.running?
               puts 'Monitoring system is not running'
               return
             end
 
             puts '🛑 Stopping monitoring system...'
-            
+
             monitoring_service.stop
-            
-            if !monitoring_service.running?
-              puts '✅ Monitoring system stopped successfully'
-            else
+
+            if monitoring_service.running?
               puts '❌ Failed to stop monitoring system'
+            else
+              puts '✅ Monitoring system stopped successfully'
             end
           end
 
@@ -125,11 +125,11 @@ module TcfPlatform
           def monitor_status
             monitoring_service = TcfPlatform::Monitoring::MonitoringService.new
             monitoring_stats = monitoring_service.status
-            
+
             puts 'Monitoring System Status'
             puts '=' * 40
             puts "Status: #{monitoring_stats[:running] ? '✅ Running' : '❌ Stopped'}"
-            
+
             if monitoring_stats[:running]
               puts "Uptime: #{format_duration(monitoring_stats[:uptime])}"
               puts "Metrics Collected: #{number_with_commas(monitoring_stats[:metrics_collected])}"
@@ -137,10 +137,10 @@ module TcfPlatform
               puts "Storage Size: #{monitoring_stats[:storage_size_mb]} MB"
               puts "Errors: #{monitoring_stats[:errors_count]}"
             end
-            
-            if options[:verbose]
-              display_verbose_monitoring_status
-            end
+
+            return unless options[:verbose]
+
+            display_verbose_monitoring_status
           end
 
           desc 'monitor-dashboard', 'Start monitoring dashboard'
@@ -148,13 +148,13 @@ module TcfPlatform
           option :host, type: :string, default: 'localhost', desc: 'Dashboard host'
           def monitor_dashboard
             monitoring_service = TcfPlatform::Monitoring::MonitoringService.new
-            
+
             puts '🖥️  Starting monitoring dashboard...'
-            
+
             begin
               dashboard_config = { port: options[:port], host: options[:host] }
               result = monitoring_service.start_dashboard(dashboard_config)
-              
+
               puts "Dashboard available at: #{result[:url]}"
             rescue StandardError => e
               puts "❌ Failed to start dashboard: #{e.message}"
@@ -167,13 +167,13 @@ module TcfPlatform
           def metrics_history
             metrics_collector = TcfPlatform::MetricsCollector.new
             history_data = metrics_collector.metrics_history
-            
+
             puts 'Metrics Collection History'
             puts '=' * 50
-            
+
             limit = options[:limit] || 20
             limited_history = history_data.last(limit)
-            
+
             limited_history.each do |entry|
               display_history_entry(entry)
             end
@@ -183,17 +183,17 @@ module TcfPlatform
           option :dry_run, type: :boolean, default: false, desc: 'Show what would be deleted'
           def monitor_cleanup
             time_series_storage = TcfPlatform::Monitoring::TimeSeriesStorage.new
-            
+
             if options[:dry_run]
               puts '🧹 DRY RUN: Analyzing expired metrics...'
             else
               puts '🧹 Cleaning up expired metrics...'
             end
-            
+
             cleanup_stats = time_series_storage.cleanup_expired_metrics(dry_run: options[:dry_run])
-            
+
             puts "Scanned: #{number_with_commas(cleanup_stats[:scanned_keys])} keys"
-            
+
             if options[:dry_run]
               puts "Would delete: #{cleanup_stats[:expired_keys]} expired keys"
               puts "Would free: #{cleanup_stats[:storage_freed_mb]} MB"
@@ -201,7 +201,7 @@ module TcfPlatform
               puts "Deleted: #{cleanup_stats[:deleted_keys]} expired keys"
               puts "Freed: #{cleanup_stats[:storage_freed_mb]} MB"
             end
-            
+
             puts "Duration: #{cleanup_stats[:cleanup_duration]} seconds"
           end
 
@@ -209,12 +209,12 @@ module TcfPlatform
 
           def display_service_metrics(service_name, metrics)
             service_data = metrics[service_name.to_sym]
-            
+
             if service_data.nil?
               puts "Service \"#{service_name}\" not found"
               return
             end
-            
+
             puts "Metrics for #{service_name}"
             puts '-' * 30
             puts "CPU: #{service_data[:cpu_percent]}%"
@@ -237,14 +237,14 @@ module TcfPlatform
           def display_metrics_table(metrics)
             puts 'TCF Platform Metrics'
             puts '=' * 40
-            
+
             healthy_count = metrics.values.count { |m| m[:status] == 'healthy' }
             total_services = metrics.size
-            
+
             puts "System Status: #{healthy_count == total_services ? '✅' : '⚠️'}"
             puts "Services Running: #{healthy_count}/#{total_services}"
             puts ''
-            
+
             metrics.each do |service, data|
               puts "#{service.to_s.capitalize}:"
               puts "  CPU: #{data[:cpu_percent]}%"
@@ -257,7 +257,7 @@ module TcfPlatform
           def display_historical_metrics(service, metric, data)
             puts "Historical data for #{service} #{metric}"
             puts '-' * 40
-            
+
             data.each do |point|
               timestamp = Time.at(point[:timestamp])
               puts "#{timestamp.strftime('%Y-%m-%d %H:%M:%S')}: #{point[:value]}"
@@ -267,7 +267,7 @@ module TcfPlatform
           def display_verbose_monitoring_status
             time_series_storage = TcfPlatform::Monitoring::TimeSeriesStorage.new
             storage_stats = time_series_storage.storage_statistics
-            
+
             puts ''
             puts 'Storage Details'
             puts '-' * 20
@@ -279,9 +279,9 @@ module TcfPlatform
           def display_history_entry(entry)
             timestamp = entry[:timestamp].strftime('%Y-%m-%d %H:%M:%S')
             service_count = entry[:services]&.size || 0
-            
+
             puts "#{timestamp} - #{service_count} services"
-            
+
             entry[:services]&.each do |service, metrics|
               puts "  #{service}: CPU: #{metrics[:cpu_percent]}%"
             end
@@ -294,21 +294,21 @@ module TcfPlatform
               metric: metric,
               resolution: options[:resolution] || 300
             }
-            
-            if options[:start_time]
-              params[:start_time] = Time.parse(options[:start_time])
-            else
-              params[:start_time] = Time.now - 3600 # Default: 1 hour ago
-            end
-            
-            if options[:end_time]
-              params[:end_time] = Time.parse(options[:end_time])
-            else
-              params[:end_time] = Time.now
-            end
-            
+
+            params[:start_time] = if options[:start_time]
+                                    Time.parse(options[:start_time])
+                                  else
+                                    Time.now - 3600 # Default: 1 hour ago
+                                  end
+
+            params[:end_time] = if options[:end_time]
+                                  Time.parse(options[:end_time])
+                                else
+                                  Time.now
+                                end
+
             params[:aggregation] = options[:aggregation] if options[:aggregation]
-            
+
             params
           end
 
@@ -320,15 +320,15 @@ module TcfPlatform
             else
               hours = (seconds / 3600).round
               minutes = ((seconds % 3600) / 60).round
-              "#{hours} hour#{hours != 1 ? 's' : ''} #{minutes} minute#{minutes != 1 ? 's' : ''}"
+              "#{hours} hour#{'s' if hours != 1} #{minutes} minute#{'s' if minutes != 1}"
             end
           end
 
           def time_ago(time)
             return 'Never' if time.nil?
-            
+
             seconds_ago = Time.now - time
-            
+
             if seconds_ago < 60
               "#{seconds_ago.round} seconds ago"
             elsif seconds_ago < 3600
