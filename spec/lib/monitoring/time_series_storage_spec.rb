@@ -270,7 +270,10 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
     end
 
     it 'provides cleanup statistics' do
-      allow(redis_client).to receive(:scan_each)
+      keys = ['metrics:key1', 'metrics:key2', 'metrics:key3']
+      allow(redis_client).to receive(:scan_each).with(match: 'metrics:*') do |&block|
+        keys.each { |key| block.call(key) }
+      end
       allow(redis_client).to receive(:ttl).and_return(-1, 3600, -1) # Mixed expired/active
       allow(redis_client).to receive(:del)
       
