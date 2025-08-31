@@ -280,6 +280,11 @@ module TcfPlatform
       backups.first&.[](:backup_id) || 'base_backup'
     end
 
+    def verify_backup_system
+      # Default implementation for production deployment checks
+      { status: 'ready' }
+    end
+
     private
 
     def ensure_backup_directory

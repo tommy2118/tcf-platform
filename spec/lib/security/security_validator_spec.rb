@@ -516,7 +516,7 @@ RSpec.describe TcfPlatform::SecurityValidator do
     end
 
     it 'handles network connectivity issues during security checks' do
-      allow(security_validator).to receive(:check_ssl_certificates).and_raise(Net::TimeoutError, 'Certificate authority timeout')
+      allow(security_validator).to receive(:check_ssl_certificates).and_raise(Net::ReadTimeout, 'Certificate authority timeout')
 
       result = security_validator.validate_production_security
 

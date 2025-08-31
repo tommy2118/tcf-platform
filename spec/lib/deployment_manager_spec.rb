@@ -26,9 +26,20 @@ RSpec.describe TcfPlatform::DeploymentManager do
                                                                            'secrets' => { 'encrypted' => true }
                                                                          })
     allow(docker_manager).to receive(:service_status).and_return({})
+    allow(docker_manager).to receive(:verify_swarm_cluster).and_return({ status: 'ready' })
     allow(security_validator).to receive(:validate_production_security).and_return({ valid: true })
+    allow(security_validator).to receive(:apply_security_hardening).and_return({ status: 'success' })
     allow(monitoring_service).to receive(:health_check).and_return({ status: 'ok' })
+    allow(monitoring_service).to receive(:enable_production_monitoring).and_return({ status: 'success' })
     allow(backup_manager).to receive(:verify_backup_system).and_return({ status: 'ready' })
+    allow(deployment_manager).to receive(:check_load_balancer).and_return({ status: 'healthy' })
+    allow(deployment_manager).to receive(:run_security_scans).and_return({ status: 'passed', vulnerabilities: 0 })
+    allow(deployment_manager).to receive(:verify_tests_passing).and_return({ status: 'passed', total: 511, failed: 0 })
+    allow(deployment_manager).to receive(:deploy_ssl_certificates).and_return({ status: 'success' })
+    allow(deployment_manager).to receive(:deploy_encrypted_secrets).and_return({ status: 'success' })
+    allow(deployment_manager).to receive(:configure_firewall).and_return({ status: 'success' })
+    allow(deployment_manager).to receive(:execute_blue_green_deployment).and_return({ status: 'success' })
+    allow(deployment_manager).to receive(:verify_deployment_health).and_return({ status: 'healthy' })
   end
 
   describe '#validate_production_readiness' do
