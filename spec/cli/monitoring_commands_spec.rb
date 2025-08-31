@@ -125,7 +125,7 @@ RSpec.describe TcfPlatform::CLI do
     end
 
     before do
-      allow(prometheus_exporter).to receive(:generate_complete_export).and_return(prometheus_output)
+      allow(prometheus_exporter).to receive(:generate_complete_export).with(any_args).and_return(prometheus_output)
     end
 
     it 'exports metrics in Prometheus format' do
@@ -134,7 +134,7 @@ RSpec.describe TcfPlatform::CLI do
       aggregate_failures do
         expect(output).to include('# HELP tcf_service_cpu_percent')
         expect(output).to include('tcf_service_cpu_percent{service="gateway"} 45.2')
-        expect(prometheus_exporter).to have_received(:generate_complete_export)
+        expect(prometheus_exporter).to have_received(:generate_complete_export).with(any_args)
       end
     end
 
@@ -457,7 +457,7 @@ RSpec.describe TcfPlatform::CLI do
       
       aggregate_failures do
         expect(output).to include('DRY RUN')
-        expect(output).to include('Would delete: 500 keys')
+        expect(output).to include('Would delete: 500 expired keys')
       end
     end
   end
