@@ -333,7 +333,8 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
       backup_path = '/tmp/metrics_backup.rdb'
 
       allow(redis_client).to receive(:bgsave)
-      allow(redis_client).to receive(:lastsave).and_return(Time.now.to_i)
+      # First call returns old timestamp, subsequent calls return new timestamp
+      allow(redis_client).to receive(:lastsave).and_return(Time.now.to_i - 10, Time.now.to_i)
       allow(FileUtils).to receive(:cp)
 
       storage.backup_storage(backup_path)
@@ -345,7 +346,13 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
       backup_path = '/tmp/metrics_backup.rdb'
 
       allow(redis_client).to receive(:bgsave)
-      allow(redis_client).to receive(:lastsave).and_return(Time.now.to_i - 3600) # Old backup
+      # Always return old timestamp to simulate backup timeout
+      old_timestamp = Time.now.to_i - 3600
+      allow(redis_client).to receive(:lastsave).and_return(old_timestamp)
+
+      # Mock Time.now to advance time and trigger timeout
+      start_time = Time.now
+      allow(Time).to receive(:now).and_return(start_time, start_time + 70) # Trigger timeout after 70 seconds
 
       expect { storage.backup_storage(backup_path) }.to raise_error(TcfPlatform::Monitoring::StorageError, /Backup failed/)
     end

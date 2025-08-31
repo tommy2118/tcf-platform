@@ -116,6 +116,21 @@ RSpec.describe TcfPlatform::CLI do
   end
 
   describe '#metrics_export' do
+    let(:current_metrics) do
+      {
+        gateway: {
+          cpu_percent: 45.2,
+          memory_percent: 62.1,
+          uptime_seconds: 86_400
+        },
+        personas: {
+          cpu_percent: 23.8,
+          memory_percent: 41.5,
+          uptime_seconds: 86_400
+        }
+      }
+    end
+
     let(:prometheus_output) do
       <<~PROMETHEUS
         # HELP tcf_service_cpu_percent Service CPU usage percentage
@@ -125,6 +140,7 @@ RSpec.describe TcfPlatform::CLI do
     end
 
     before do
+      allow(metrics_collector).to receive(:collect_service_metrics).and_return(current_metrics)
       allow(prometheus_exporter).to receive(:generate_complete_export).with(any_args).and_return(prometheus_output)
     end
 
@@ -343,7 +359,7 @@ RSpec.describe TcfPlatform::CLI do
 
   describe '#monitor_dashboard' do
     it 'starts monitoring dashboard server' do
-      allow(monitoring_service).to receive(:start_dashboard)
+      allow(monitoring_service).to receive(:start_dashboard).and_return({ url: 'http://localhost:3001' })
       allow(monitoring_service).to receive(:dashboard_url).and_return('http://localhost:3001')
 
       output = capture_stdout { cli.monitor_dashboard }
