@@ -8,6 +8,7 @@ require_relative 'config_commands'
 require_relative 'repository_commands'
 require_relative 'dev_commands'
 require_relative 'backup_commands'
+require_relative 'monitoring_commands'
 
 module TcfPlatform
   # Main CLI class for TCF Platform management
@@ -18,6 +19,7 @@ module TcfPlatform
     include RepositoryCommands
     include DevCommands
     include BackupCommands
+    include MonitoringCommands
 
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
 
@@ -98,6 +100,16 @@ module TcfPlatform
         puts '  tcf-platform backup-restore ID  # Restore backup (--components LIST, --force)'
         puts '  tcf-platform backup-validate ID # Validate backup integrity'
         puts '  tcf-platform backup-status      # Show backup system status'
+        puts ''
+        puts 'Monitoring & Metrics Commands:'
+        puts '  tcf-platform metrics-show [SVC] # Show current metrics (--format json)'
+        puts '  tcf-platform metrics-export     # Export Prometheus metrics (--output FILE)'
+        puts '  tcf-platform metrics-query S M  # Query historical data (--start-time, --end-time)'
+        puts '  tcf-platform monitor-start      # Start monitoring system (--background)'
+        puts '  tcf-platform monitor-stop       # Stop monitoring system'
+        puts '  tcf-platform monitor-status     # Show monitoring status (--verbose)'
+        puts '  tcf-platform monitor-dashboard  # Start web dashboard (--port 3001)'
+        puts '  tcf-platform monitor-cleanup    # Clean expired metrics (--dry-run)'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'

@@ -35,6 +35,12 @@ gem 'pg', '~> 1.5'
 # CLI tools
 gem 'thor', '~> 1.3'
 
+# HTTP server for metrics
+gem 'webrick'
+
+# Structured data
+gem 'ostruct'
+
 group :development, :test do
   gem 'brakeman' # Static security analysis
   gem 'bundler-audit' # Security vulnerability scanning
