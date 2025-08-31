@@ -13,27 +13,27 @@ module TcfPlatform
       "#{service}-green"
     end
 
-    def switch_traffic(service, from: nil, to: nil)
+    def switch_traffic(_service, from: nil, to: nil)
       # Implementation for switching traffic between environments
       { status: 'success', switch_time: 2.5 }
     end
 
-    def set_traffic_percentage(service, target, percentage)
+    def set_traffic_percentage(_service, _target, percentage)
       # Implementation for setting traffic percentage
       { status: 'success', current_percentage: percentage }
     end
 
-    def switch_traffic_instant(service, from:, to:)
+    def switch_traffic_instant(_service, from:, to:)
       # Implementation for instant traffic switching
       { status: 'success', switch_time: 0.5 }
     end
 
-    def validate_traffic_switch(service, target)
+    def validate_traffic_switch(_service, _target)
       # Implementation for validating traffic switch capability
       { valid: true }
     end
 
-    def revert_traffic(service, to:)
+    def revert_traffic(_service, to:)
       # Implementation for reverting traffic
       { status: 'success' }
     end
