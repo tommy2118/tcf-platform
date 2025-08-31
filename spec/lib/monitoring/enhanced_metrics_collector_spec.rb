@@ -168,7 +168,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     end
 
     it 'handles services without custom metrics endpoints' do
-      allow(collector).to receive(:fetch_service_metrics).and_raise(Net::HTTPBadResponse.new('Not Found'))
+      allow(collector).to receive(:fetch_service_metrics).and_raise(Net::HTTPError.new('Not Found', nil))
       
       app_metrics = collector.collect_application_metrics('personas')
       
@@ -178,10 +178,15 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
   describe '#collect_with_retries' do
     it 'retries failed collections based on configuration' do
-      allow(docker_manager).to receive(:service_stats)
-        .and_raise(StandardError, 'Connection failed')
-        .and_raise(StandardError, 'Connection failed')
-        .and_return({})
+      call_count = 0
+      allow(docker_manager).to receive(:service_stats) do
+        call_count += 1
+        if call_count <= 2
+          raise StandardError, 'Connection failed'
+        else
+          {}
+        end
+      end
       
       expect { collector.collect_with_retries { docker_manager.service_stats } }.not_to raise_error
       expect(docker_manager).to have_received(:service_stats).exactly(3).times
@@ -272,7 +277,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     end
 
     it 'identifies anomalies in metric patterns' do
-      # Simulate data with anomaly
+      # Simulate data with anomaly (using symbols for service and metric keys)
       anomalous_data = [
         { timestamp: Time.now - 300, services: { gateway: { cpu_percent: 45.0 } } },
         { timestamp: Time.now - 240, services: { gateway: { cpu_percent: 47.0 } } },
