@@ -279,11 +279,12 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     it 'identifies anomalies in metric patterns' do
       # Simulate data with anomaly (using symbols for service and metric keys)
       anomalous_data = [
-        { timestamp: Time.now - 300, services: { gateway: { cpu_percent: 45.0 } } },
-        { timestamp: Time.now - 240, services: { gateway: { cpu_percent: 47.0 } } },
-        { timestamp: Time.now - 180, services: { gateway: { cpu_percent: 95.0 } } }, # Anomaly
-        { timestamp: Time.now - 120, services: { gateway: { cpu_percent: 46.0 } } },
-        { timestamp: Time.now - 60, services: { gateway: { cpu_percent: 48.0 } } }
+        { timestamp: Time.now - 360, services: { gateway: { cpu_percent: 50.0 } } },
+        { timestamp: Time.now - 300, services: { gateway: { cpu_percent: 52.0 } } },
+        { timestamp: Time.now - 240, services: { gateway: { cpu_percent: 51.0 } } },
+        { timestamp: Time.now - 180, services: { gateway: { cpu_percent: 100.0 } } }, # Anomaly
+        { timestamp: Time.now - 120, services: { gateway: { cpu_percent: 49.0 } } },
+        { timestamp: Time.now - 60, services: { gateway: { cpu_percent: 53.0 } } }
       ]
       
       allow(collector).to receive(:metrics_history).and_return(anomalous_data)
@@ -293,7 +294,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
       aggregate_failures do
         expect(anomalies).not_to be_empty
         expect(anomalies.first[:timestamp]).to be_within(1).of(Time.now - 180)
-        expect(anomalies.first[:value]).to eq(95.0)
+        expect(anomalies.first[:value]).to eq(100.0)
         expect(anomalies.first[:anomaly_score]).to be > 0.8
       end
     end
