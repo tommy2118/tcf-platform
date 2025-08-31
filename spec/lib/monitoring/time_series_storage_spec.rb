@@ -187,10 +187,18 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
     it 'supports aggregation functions (avg, min, max, sum)' do
       query_with_aggregation = query_params.merge(aggregation: 'avg')
       
-      allow(storage).to receive(:fetch_raw_data).and_return([
-        { value: 45.2, timestamp: 1693276800 },
-        { value: 47.8, timestamp: 1693277100 },
-        { value: 52.1, timestamp: 1693277400 }
+      # Mock Redis calls for aggregation test
+      index_key = 'metrics:index:gateway:cpu_percent'
+      expected_timestamps = [1693276800, 1693277100, 1693277400]
+      
+      allow(redis_client).to receive(:zrangebyscore)
+        .with(index_key, query_params[:start_time].to_i, query_params[:end_time].to_i)
+        .and_return(expected_timestamps.map(&:to_s))
+      
+      allow(redis_client).to receive(:mget).and_return([
+        { value: 45.2, timestamp: 1693276800 }.to_json,
+        { value: 47.8, timestamp: 1693277100 }.to_json,
+        { value: 52.1, timestamp: 1693277400 }.to_json
       ])
       
       result = storage.query_metrics(query_with_aggregation)

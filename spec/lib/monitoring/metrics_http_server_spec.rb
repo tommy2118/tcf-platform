@@ -347,8 +347,10 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
   describe '#graceful_shutdown' do
     it 'completes active requests before shutdown' do
       # Mock active connections
+      allow(server).to receive(:running?).and_return(true)
       allow(server).to receive(:active_connections).and_return(2)
-      allow(server).to receive(:wait_for_connections_to_complete)
+      allow(server).to receive(:wait_for_connections_to_complete).and_return(true)
+      allow(server).to receive(:stop)
       
       server.graceful_shutdown(timeout: 5)
       
@@ -356,6 +358,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
     end
 
     it 'forces shutdown after timeout' do
+      allow(server).to receive(:running?).and_return(true)
       allow(server).to receive(:active_connections).and_return(1)
       allow(server).to receive(:wait_for_connections_to_complete).and_return(false) # Timeout
       allow(server).to receive(:force_shutdown)

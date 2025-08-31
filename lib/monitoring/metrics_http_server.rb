@@ -82,7 +82,7 @@ module TcfPlatform
       end
 
       def graceful_shutdown(timeout: 10)
-        return unless @running
+        return unless running?
 
         # Wait for active connections to complete
         if wait_for_connections_to_complete(timeout)

@@ -164,6 +164,14 @@ module TcfPlatform
     end
     # rubocop:enable Metrics/AbcSize
 
+    def service_stats(service_name = nil)
+      if service_name
+        get_service_stats(service_name)
+      else
+        get_all_services_stats
+      end
+    end
+
     private
 
     def calculate_uptime_from_created(created_at_str)
@@ -181,14 +189,6 @@ module TcfPlatform
       end
     rescue StandardError
       'unknown'
-    end
-
-    def service_stats(service_name = nil)
-      if service_name
-        get_service_stats(service_name)
-      else
-        get_all_services_stats
-      end
     end
 
     private
