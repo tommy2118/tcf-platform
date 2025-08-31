@@ -168,7 +168,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     end
 
     it 'handles services without custom metrics endpoints' do
-      allow(collector).to receive(:fetch_service_metrics).and_raise(Net::HTTPError, 'Not Found')
+      allow(collector).to receive(:fetch_service_metrics).and_raise(Net::HTTPBadResponse.new('Not Found'))
       
       app_metrics = collector.collect_application_metrics('personas')
       
@@ -209,6 +209,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
   describe '#metrics_caching' do
     it 'caches metrics to reduce collection overhead' do
+      allow(docker_manager).to receive(:service_status).and_return({}).once
       allow(docker_manager).to receive(:service_stats).and_return({}).once
       
       # First call should hit Docker
@@ -222,6 +223,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'respects cache TTL configuration' do
       collector = described_class.new(metrics_cache_ttl: 1) # 1 second TTL
+      allow(docker_manager).to receive(:service_status).and_return({})
       allow(docker_manager).to receive(:service_stats).and_return({})
       
       # First call
@@ -237,6 +239,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     end
 
     it 'allows bypassing cache when needed' do
+      allow(docker_manager).to receive(:service_status).and_return({})
       allow(docker_manager).to receive(:service_stats).and_return({})
       
       collector.collect_comprehensive_metrics # Prime cache
