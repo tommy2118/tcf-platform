@@ -340,7 +340,7 @@ module TcfPlatform
 
       def dashboard_url
         return nil unless @dashboard_server&.running?
-        
+
         port = @config[:dashboard_port] || 3001
         "http://localhost:#{port}"
       end

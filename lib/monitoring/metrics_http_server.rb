@@ -265,14 +265,6 @@ module TcfPlatform
         @server_thread&.kill if @server_thread&.alive?
         @running = false
       end
-
-      def wait_for_connections_to_complete(timeout_seconds)
-        start_time = Time.now
-        while active_connections > 0 && (Time.now - start_time) < timeout_seconds
-          sleep 0.1
-        end
-        active_connections.zero?
-      end
     end
   end
 end

@@ -20,9 +20,9 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
         retry_attempts: 3,
         metrics_cache_ttl: 60
       }
-      
+
       collector = described_class.new(config)
-      
+
       aggregate_failures do
         expect(collector.collection_timeout).to eq(30)
         expect(collector.retry_attempts).to eq(3)
@@ -76,7 +76,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'collects enhanced container metrics including PIDs and disk I/O' do
       metrics = collector.collect_comprehensive_metrics
-      
+
       aggregate_failures do
         expect(metrics[:services][:gateway]).to include(
           cpu_percent: 2.45,
@@ -88,7 +88,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
           disk_write_bytes: be_a(Integer),
           process_count: 25
         )
-        
+
         expect(metrics[:services][:personas]).to include(
           cpu_percent: 1.20,
           memory_percent: 4.76,
@@ -99,7 +99,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'includes service health status in metrics' do
       metrics = collector.collect_comprehensive_metrics
-      
+
       aggregate_failures do
         expect(metrics[:services][:gateway][:health_status]).to eq('healthy')
         expect(metrics[:services][:personas][:health_status]).to eq('healthy')
@@ -110,18 +110,18 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     it 'collects system-wide metrics' do
       allow(collector).to receive(:collect_system_load).and_return(2.45)
       allow(collector).to receive(:collect_disk_metrics).and_return({
-        usage_percent: 78.3,
-        available_bytes: 50_000_000_000,
-        total_bytes: 200_000_000_000
-      })
+                                                                      usage_percent: 78.3,
+                                                                      available_bytes: 50_000_000_000,
+                                                                      total_bytes: 200_000_000_000
+                                                                    })
       allow(collector).to receive(:collect_network_metrics).and_return({
-        interfaces: {
-          'eth0' => { rx_bytes: 1_000_000, tx_bytes: 2_000_000 }
-        }
-      })
-      
+                                                                         interfaces: {
+                                                                           'eth0' => { rx_bytes: 1_000_000, tx_bytes: 2_000_000 }
+                                                                         }
+                                                                       })
+
       metrics = collector.collect_comprehensive_metrics
-      
+
       aggregate_failures do
         expect(metrics[:system]).to include(
           load_average: 2.45,
@@ -134,7 +134,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'includes collection metadata' do
       metrics = collector.collect_comprehensive_metrics
-      
+
       aggregate_failures do
         expect(metrics[:metadata]).to include(
           :collection_timestamp,
@@ -151,16 +151,16 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
   describe '#collect_application_metrics' do
     it 'collects custom application metrics from services' do
       allow(collector).to receive(:fetch_service_metrics).with('gateway', '/metrics').and_return({
-        'http_requests_total' => 15432,
-        'http_request_duration_seconds_avg' => 0.145,
-        'active_connections' => 25
-      })
-      
+                                                                                                   'http_requests_total' => 15_432,
+                                                                                                   'http_request_duration_seconds_avg' => 0.145,
+                                                                                                   'active_connections' => 25
+                                                                                                 })
+
       app_metrics = collector.collect_application_metrics('gateway')
-      
+
       aggregate_failures do
         expect(app_metrics).to include(
-          http_requests_total: 15432,
+          http_requests_total: 15_432,
           avg_response_time_seconds: 0.145,
           active_connections: 25
         )
@@ -169,9 +169,9 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'handles services without custom metrics endpoints' do
       allow(collector).to receive(:fetch_service_metrics).and_raise(Net::HTTPError.new('Not Found', nil))
-      
+
       app_metrics = collector.collect_application_metrics('personas')
-      
+
       expect(app_metrics).to eq({ custom_metrics_available: false })
     end
   end
@@ -181,28 +181,26 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
       call_count = 0
       allow(docker_manager).to receive(:service_stats) do
         call_count += 1
-        if call_count <= 2
-          raise StandardError, 'Connection failed'
-        else
-          {}
-        end
+        raise StandardError, 'Connection failed' if call_count <= 2
+
+        {}
       end
-      
+
       expect { collector.collect_with_retries { docker_manager.service_stats } }.not_to raise_error
       expect(docker_manager).to have_received(:service_stats).exactly(3).times
     end
 
     it 'raises error after exhausting retry attempts' do
       allow(docker_manager).to receive(:service_stats).and_raise(StandardError, 'Persistent failure')
-      
-      expect { 
+
+      expect do
         collector.collect_with_retries { docker_manager.service_stats }
-      }.to raise_error(TcfPlatform::Monitoring::CollectionError, /Persistent failure/)
+      end.to raise_error(TcfPlatform::Monitoring::CollectionError, /Persistent failure/)
     end
 
     it 'includes retry information in error details' do
       allow(docker_manager).to receive(:service_stats).and_raise(StandardError, 'Persistent failure')
-      
+
       begin
         collector.collect_with_retries { docker_manager.service_stats }
       rescue TcfPlatform::Monitoring::CollectionError => e
@@ -216,13 +214,13 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     it 'caches metrics to reduce collection overhead' do
       allow(docker_manager).to receive(:service_status).and_return({}).once
       allow(docker_manager).to receive(:service_stats).and_return({}).once
-      
+
       # First call should hit Docker
       collector.collect_comprehensive_metrics
-      
+
       # Second call should use cache
       cached_metrics = collector.collect_comprehensive_metrics
-      
+
       expect(cached_metrics[:metadata][:from_cache]).to be true
     end
 
@@ -230,26 +228,26 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
       collector = described_class.new(metrics_cache_ttl: 1) # 1 second TTL
       allow(docker_manager).to receive(:service_status).and_return({})
       allow(docker_manager).to receive(:service_stats).and_return({})
-      
+
       # First call
       collector.collect_comprehensive_metrics
-      
+
       # Wait for cache to expire
       sleep 2
-      
+
       # Should call Docker again
       collector.collect_comprehensive_metrics
-      
+
       expect(docker_manager).to have_received(:service_stats).twice
     end
 
     it 'allows bypassing cache when needed' do
       allow(docker_manager).to receive(:service_status).and_return({})
       allow(docker_manager).to receive(:service_stats).and_return({})
-      
+
       collector.collect_comprehensive_metrics # Prime cache
       fresh_metrics = collector.collect_comprehensive_metrics(bypass_cache: true)
-      
+
       expect(fresh_metrics[:metadata][:from_cache]).to be false
       expect(docker_manager).to have_received(:service_stats).twice
     end
@@ -259,15 +257,15 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     it 'calculates performance trends over time' do
       # Simulate historical data
       allow(collector).to receive(:metrics_history).and_return([
-        { timestamp: Time.now - 300, services: { gateway: { cpu_percent: 40.0 } } },
-        { timestamp: Time.now - 240, services: { gateway: { cpu_percent: 45.0 } } },
-        { timestamp: Time.now - 180, services: { gateway: { cpu_percent: 50.0 } } },
-        { timestamp: Time.now - 120, services: { gateway: { cpu_percent: 52.0 } } },
-        { timestamp: Time.now - 60, services: { gateway: { cpu_percent: 48.0 } } }
-      ])
-      
+                                                                 { timestamp: Time.now - 300, services: { gateway: { cpu_percent: 40.0 } } },
+                                                                 { timestamp: Time.now - 240, services: { gateway: { cpu_percent: 45.0 } } },
+                                                                 { timestamp: Time.now - 180, services: { gateway: { cpu_percent: 50.0 } } },
+                                                                 { timestamp: Time.now - 120, services: { gateway: { cpu_percent: 52.0 } } },
+                                                                 { timestamp: Time.now - 60, services: { gateway: { cpu_percent: 48.0 } } }
+                                                               ])
+
       trends = collector.collect_historical_trends('gateway', 'cpu_percent', 300)
-      
+
       aggregate_failures do
         expect(trends).to include(:trend_direction) # 'increasing', 'decreasing', 'stable'
         expect(trends).to include(:average_change_per_minute)
@@ -286,11 +284,11 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
         { timestamp: Time.now - 120, services: { gateway: { cpu_percent: 49.0 } } },
         { timestamp: Time.now - 60, services: { gateway: { cpu_percent: 53.0 } } }
       ]
-      
+
       allow(collector).to receive(:metrics_history).and_return(anomalous_data)
-      
+
       anomalies = collector.detect_metric_anomalies('gateway', 'cpu_percent', 300)
-      
+
       aggregate_failures do
         expect(anomalies).not_to be_empty
         expect(anomalies.first[:timestamp]).to be_within(1).of(Time.now - 180)
@@ -313,7 +311,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'calculates comprehensive health score for services' do
       health_score = collector.calculate_service_health_score('gateway', service_metrics)
-      
+
       aggregate_failures do
         expect(health_score).to include(:overall_score) # 0-100
         expect(health_score).to include(:component_scores)
@@ -324,7 +322,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'provides health recommendations' do
       health_analysis = collector.analyze_service_health('gateway', service_metrics)
-      
+
       aggregate_failures do
         expect(health_analysis).to include(:health_status) # 'excellent', 'good', 'warning', 'critical'
         expect(health_analysis).to include(:recommendations)
@@ -339,9 +337,9 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
         response_time_ms: 2000.0,
         error_rate_percent: 15.0
       }
-      
+
       health_analysis = collector.analyze_service_health('gateway', risky_metrics)
-      
+
       aggregate_failures do
         expect(health_analysis[:health_status]).to eq('critical')
         expect(health_analysis[:at_risk_factors]).to include('cpu', 'memory', 'response_time', 'error_rate')
@@ -357,12 +355,12 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
         system: { load_average: 2.5 },
         metadata: { collection_timestamp: Time.now }
       }
-      
+
       # Populate with many services
       50.times { |i| large_dataset[:services]["service_#{i}"] }
-      
+
       exported_batch = collector.export_metrics_batch(large_dataset)
-      
+
       aggregate_failures do
         expect(exported_batch).to be_an(Array)
         expect(exported_batch.length).to be > 50 # Should have metrics for all services plus system
@@ -372,10 +370,10 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
 
     it 'handles export errors gracefully' do
       corrupted_data = { invalid: 'data structure' }
-      
-      expect { 
-        collector.export_metrics_batch(corrupted_data) 
-      }.to raise_error(TcfPlatform::Monitoring::ExportError)
+
+      expect do
+        collector.export_metrics_batch(corrupted_data)
+      end.to raise_error(TcfPlatform::Monitoring::ExportError)
     end
   end
 end

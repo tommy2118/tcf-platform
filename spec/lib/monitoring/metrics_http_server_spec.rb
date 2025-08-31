@@ -24,7 +24,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
         host: 'localhost',
         path: '/custom-metrics'
       )
-      
+
       aggregate_failures do
         expect(custom_server.port).to eq(8080)
         expect(custom_server.host).to eq('localhost')
@@ -45,7 +45,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'starts HTTP server on configured port' do
       server.start
-      
+
       expect(WEBrick::HTTPServer).to have_received(:new).with(
         hash_including(Port: 9091, BindAddress: '0.0.0.0')
       )
@@ -54,29 +54,29 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'mounts metrics endpoint at configured path' do
       server.start
-      
+
       expect(webrick_server).to have_received(:mount_proc).with('/metrics')
     end
 
     it 'runs server in background thread' do
       allow(Thread).to receive(:new).and_return(instance_double(Thread))
-      
+
       server.start
-      
+
       expect(Thread).to have_received(:new)
       expect(server.running?).to be true
     end
 
     it 'handles port already in use error' do
       allow(WEBrick::HTTPServer).to receive(:new).and_raise(Errno::EADDRINUSE)
-      
+
       expect { server.start }.to raise_error(TcfPlatform::Monitoring::ServerStartupError, /Port 9091 is already in use/)
     end
 
     it 'prevents multiple server instances' do
       # First start should succeed
       server.start
-      
+
       # Second start should raise error
       expect { server.start }.to raise_error(StandardError, /already running/)
     end
@@ -100,9 +100,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
       server.instance_variable_set(:@webrick_server, webrick_server)
       server.instance_variable_set(:@server_thread, server_thread)
       allow(server_thread).to receive(:alive?).and_return(true)
-      
+
       server.stop
-      
+
       aggregate_failures do
         expect(webrick_server).to have_received(:shutdown)
         expect(server_thread).to have_received(:kill)
@@ -113,7 +113,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'handles stop when server not running' do
       allow(server).to receive(:running?).and_return(false)
-      
+
       expect { server.stop }.not_to raise_error
     end
   end
@@ -139,7 +139,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'serves Prometheus metrics on GET request' do
       server.send(:metrics_endpoint_handler, request, response)
-      
+
       aggregate_failures do
         expect(response).to have_received(:status=).with(200)
         expect(response).to have_received(:content_type=).with('text/plain; version=0.0.4; charset=utf-8')
@@ -150,9 +150,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'handles HEAD requests for monitoring probes' do
       allow(request).to receive(:request_method).and_return('HEAD')
-      
+
       server.send(:metrics_endpoint_handler, request, response)
-      
+
       aggregate_failures do
         expect(response).to have_received(:status=).with(200)
         expect(response).to have_received(:content_type=).with('text/plain; version=0.0.4; charset=utf-8')
@@ -162,9 +162,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'returns 405 for unsupported HTTP methods' do
       allow(request).to receive(:request_method).and_return('POST')
-      
+
       server.send(:metrics_endpoint_handler, request, response)
-      
+
       aggregate_failures do
         expect(response).to have_received(:status=).with(405)
         expect(response).to have_received(:body=).with('Method Not Allowed')
@@ -173,14 +173,14 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'handles metrics collection errors gracefully' do
       allow(monitoring_service).to receive(:prometheus_metrics).and_raise(StandardError, 'Collection failed')
-      
+
       # Test the actual behavior - the error should be raised and handled by mount_endpoints
       expect { server.send(:metrics_endpoint_handler, request, response) }.to raise_error(StandardError, 'Collection failed')
     end
 
     it 'includes proper HTTP headers for Prometheus compatibility' do
       server.send(:metrics_endpoint_handler, request, response)
-      
+
       # Verify content type matches Prometheus specification
       expect(response).to have_received(:content_type=).with('text/plain; version=0.0.4; charset=utf-8')
     end
@@ -209,7 +209,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'serves health check information' do
       server.send(:health_endpoint_handler, request, response)
-      
+
       aggregate_failures do
         expect(response).to have_received(:status=).with(200)
         expect(response).to have_received(:content_type=).with('application/json')
@@ -220,9 +220,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
     it 'returns 503 for unhealthy status' do
       unhealthy_status = health_status.merge(status: 'degraded')
       allow(monitoring_service).to receive(:health_check).and_return(unhealthy_status)
-      
+
       server.send(:health_endpoint_handler, request, response)
-      
+
       expect(response).to have_received(:status=).with(503)
     end
   end
@@ -240,7 +240,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'provides server configuration and status information' do
       server.send(:server_info_endpoint_handler, request, response)
-      
+
       expect(response).to have_received(:status=).with(200)
       expect(response).to have_received(:content_type=).with('application/json')
       expect(response).to have_received(:body=) do |body|
@@ -260,7 +260,7 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
         username: 'monitoring',
         password: 'secret123'
       )
-      
+
       expect(server.auth_config).to include(
         auth_type: 'basic',
         username: 'monitoring'
@@ -270,19 +270,19 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
 
     it 'supports IP whitelist configuration' do
       allowed_ips = ['127.0.0.1', '10.0.0.0/8', '192.168.1.0/24']
-      
+
       server.configure_security(
         auth_type: 'ip_whitelist',
         allowed_ips: allowed_ips
       )
-      
+
       expect(server.auth_config[:allowed_ips]).to eq(allowed_ips)
     end
 
     it 'validates security configuration parameters' do
-      expect { 
-        server.configure_security(auth_type: 'invalid_type') 
-      }.to raise_error(ArgumentError, /Unsupported auth_type/)
+      expect do
+        server.configure_security(auth_type: 'invalid_type')
+      end.to raise_error(ArgumentError, /Unsupported auth_type/)
     end
   end
 
@@ -296,29 +296,27 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
     end
 
     it 'logs successful requests' do
-      request = instance_double(WEBrick::HTTPRequest, 
-        request_method: 'GET', 
-        unparsed_uri: '/metrics',
-        peeraddr: [nil, nil, nil, '127.0.0.1'],
-        body: 'test data'
-      )
-      
+      request = instance_double(WEBrick::HTTPRequest,
+                                request_method: 'GET',
+                                unparsed_uri: '/metrics',
+                                peeraddr: [nil, nil, nil, '127.0.0.1'],
+                                body: 'test data')
+
       server.send(:log_request, request, 200, 1024)
-      
-      expect(logger).to have_received(:info).with(/GET \/metrics - 200 - \d+\.?\d* ms - \d+ bytes from/)
+
+      expect(logger).to have_received(:info).with(%r{GET /metrics - 200 - \d+\.?\d* ms - \d+ bytes from})
     end
 
     it 'logs error requests with appropriate level' do
-      request = instance_double(WEBrick::HTTPRequest, 
-        request_method: 'POST', 
-        unparsed_uri: '/metrics',
-        peeraddr: [nil, nil, nil, '127.0.0.1'],
-        body: 'error data'
-      )
-      
+      request = instance_double(WEBrick::HTTPRequest,
+                                request_method: 'POST',
+                                unparsed_uri: '/metrics',
+                                peeraddr: [nil, nil, nil, '127.0.0.1'],
+                                body: 'error data')
+
       server.send(:log_request, request, 405, 0)
-      
-      expect(logger).to have_received(:error).with(/POST \/metrics - 405 - \d+\.?\d* ms - \d+ bytes from/)
+
+      expect(logger).to have_received(:error).with(%r{POST /metrics - 405 - \d+\.?\d* ms - \d+ bytes from})
     end
   end
 
@@ -326,9 +324,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
     it 'tracks request metrics' do
       # Simulate several requests
       10.times { server.send(:record_request_metrics, 'GET', '/metrics', 200, 0.05) }
-      
+
       metrics = server.request_metrics
-      
+
       aggregate_failures do
         expect(metrics[:total_requests]).to eq(10)
         expect(metrics[:successful_requests]).to eq(10)
@@ -339,9 +337,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
     it 'identifies slow requests' do
       # Record a slow request
       server.send(:record_request_metrics, 'GET', '/metrics', 200, 2.5)
-      
+
       slow_requests = server.slow_requests_log
-      
+
       expect(slow_requests).not_to be_empty
       expect(slow_requests.first[:duration_ms]).to eq(2500)
     end
@@ -354,9 +352,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
       allow(server).to receive(:active_connections).and_return(2)
       allow(server).to receive(:wait_for_connections_to_complete).and_return(true)
       allow(server).to receive(:stop)
-      
+
       server.graceful_shutdown(timeout: 5)
-      
+
       expect(server).to have_received(:wait_for_connections_to_complete).with(5)
     end
 
@@ -365,9 +363,9 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
       allow(server).to receive(:active_connections).and_return(1)
       allow(server).to receive(:wait_for_connections_to_complete).and_return(false) # Timeout
       allow(server).to receive(:force_shutdown)
-      
+
       server.graceful_shutdown(timeout: 1)
-      
+
       expect(server).to have_received(:force_shutdown)
     end
   end
