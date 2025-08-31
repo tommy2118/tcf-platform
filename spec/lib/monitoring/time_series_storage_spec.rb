@@ -140,8 +140,10 @@ RSpec.describe TcfPlatform::Monitoring::TimeSeriesStorage do
     end
 
     it 'provides atomic batch storage (all or nothing)' do
-      allow(redis_client).to receive(:multi).and_yield
-      allow(redis_client).to receive(:setex).and_raise(Redis::TimeoutError)
+      transaction_mock = instance_double('Redis::Transaction')
+      allow(transaction_mock).to receive(:setex).and_raise(Redis::TimeoutError)
+      allow(transaction_mock).to receive(:zadd)
+      allow(redis_client).to receive(:multi).and_yield(transaction_mock)
       
       expect { storage.store_batch(batch_metrics) }.to raise_error(TcfPlatform::Monitoring::StorageError)
     end

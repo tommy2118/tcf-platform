@@ -296,7 +296,8 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
       request = instance_double(WEBrick::HTTPRequest, 
         request_method: 'GET', 
         unparsed_uri: '/metrics',
-        peeraddr: [nil, nil, nil, '127.0.0.1']
+        peeraddr: [nil, nil, nil, '127.0.0.1'],
+        body: 'test data'
       )
       
       server.send(:log_request, request, 200, 1024)
@@ -308,7 +309,8 @@ RSpec.describe TcfPlatform::Monitoring::MetricsHttpServer do
       request = instance_double(WEBrick::HTTPRequest, 
         request_method: 'POST', 
         unparsed_uri: '/metrics',
-        peeraddr: [nil, nil, nil, '127.0.0.1']
+        peeraddr: [nil, nil, nil, '127.0.0.1'],
+        body: 'error data'
       )
       
       server.send(:log_request, request, 405, 0)
