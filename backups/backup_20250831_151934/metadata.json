@@ -1,12 +1,12 @@
 {
-  "backup_id": "failed_backup",
+  "backup_id": "backup_20250831_151934",
   "type": "full",
-  "status": "partial",
+  "status": "completed",
   "components": {
     "databases": {
-      "status": "failed",
-      "error": "Connection failed",
-      "duration": 0.0
+      "status": "completed",
+      "count": 5,
+      "duration": 30.5
     },
     "redis": {
       "status": "completed",
@@ -29,7 +29,7 @@
       "duration": 2.1
     }
   },
-  "created_at": "2025-08-31 15:25:02 -0400",
-  "size": 678,
-  "duration": 0.000234
+  "created_at": "2025-08-31 15:19:34 -0400",
+  "size": 0,
+  "duration": 0.000337
 }

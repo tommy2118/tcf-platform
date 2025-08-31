@@ -34,8 +34,8 @@
       "type": "incremental"
     }
   },
-  "created_at": "2025-08-29 23:34:29 -0400",
+  "created_at": "2025-08-31 15:25:02 -0400",
   "base_backup": "base_backup",
   "size": 852,
-  "duration": 0.000135
+  "duration": 0.000191
 }
