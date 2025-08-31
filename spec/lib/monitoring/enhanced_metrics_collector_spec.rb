@@ -70,7 +70,7 @@ RSpec.describe TcfPlatform::Monitoring::EnhancedMetricsCollector do
     end
 
     before do
-      allow(TcfPlatform::ServiceRegistry).to receive(:all_services).and_return(service_status.keys)
+      allow(docker_manager).to receive(:service_status).and_return(service_status)
       allow(docker_manager).to receive(:service_stats).and_return(docker_stats)
     end
 

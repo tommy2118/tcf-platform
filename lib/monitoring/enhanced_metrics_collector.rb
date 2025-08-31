@@ -37,7 +37,7 @@ module TcfPlatform
 
         begin
           # Get service status and Docker stats
-          service_status = TcfPlatform::ServiceRegistry.all_services
+          service_status = @docker_manager.service_status
           docker_stats = @docker_manager.service_stats
 
           # Build comprehensive metrics
