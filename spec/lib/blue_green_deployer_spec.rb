@@ -101,6 +101,7 @@ RSpec.describe TcfPlatform::BlueGreenDeployer do
       end
 
       it 'validates deployment config before starting' do
+        allow(docker_manager).to receive(:create_service)
         expect(deployment_validator).to receive(:validate_deployment_config)
           .with(deployment_config)
           .and_return({ valid: false, errors: ['Missing required image tag', 'Invalid replica count'] })
@@ -117,6 +118,7 @@ RSpec.describe TcfPlatform::BlueGreenDeployer do
 
     context 'when deployment validation fails' do
       it 'prevents deployment with invalid configuration' do
+        allow(docker_manager).to receive(:create_service)
         expect(deployment_validator).to receive(:validate_deployment_config)
           .and_return({ 
             valid: false, 

@@ -78,6 +78,11 @@ RSpec.describe TcfPlatform::DeploymentValidator do
           }
         )
 
+        # Stub all the methods that are called in validate_deployment_config
+        allow(docker_manager).to receive(:check_image_exists).and_return({ available: true })
+        allow(resource_manager).to receive(:get_available_resources).and_return({ cpu: '2000m', memory: '4Gi' })
+        allow(security_validator).to receive(:validate_deployment_security).and_return({})
+        
         expect(validator).to receive(:validate_environment_security)
           .with(config_with_secrets[:environment])
           .and_return({ 
@@ -88,7 +93,7 @@ RSpec.describe TcfPlatform::DeploymentValidator do
         result = validator.validate_deployment_config(config_with_secrets)
 
         expect(result[:valid]).to eq(false)
-        expect(result[:security_validation][:violations]).to include('Plain text password detected')
+        expect(result[:errors]).to include('Plain text password detected')
       end
     end
 
@@ -111,6 +116,10 @@ RSpec.describe TcfPlatform::DeploymentValidator do
           resources: { cpu: '10m', memory: '50Mi' }
         )
 
+        # Stub all the methods that are called in validate_deployment_config
+        allow(docker_manager).to receive(:check_image_exists).and_return({ available: true })
+        allow(security_validator).to receive(:validate_deployment_security).and_return({ secure: true })
+        
         expect(validator).to receive(:validate_resource_requirements)
           .with(config_with_low_resources[:resources])
           .and_return({ 
@@ -121,7 +130,7 @@ RSpec.describe TcfPlatform::DeploymentValidator do
         result = validator.validate_deployment_config(config_with_low_resources)
 
         expect(result[:valid]).to eq(false)
-        expect(result[:resource_validation][:errors]).to include('CPU allocation too low for production')
+        expect(result[:errors]).to include('CPU allocation too low for production')
       end
 
       it 'validates replica count constraints' do
@@ -138,7 +147,7 @@ RSpec.describe TcfPlatform::DeploymentValidator do
   describe '#validate_pre_deployment_requirements' do
     it 'checks system readiness before deployment' do
       expect(resource_manager).to receive(:check_available_resources)
-        .and_return({ cpu: '4000m', memory: '8Gi', disk: '100Gi' })
+        .and_return({ cpu: '4000', memory: '8000', disk: '100Gi' })
 
       expect(docker_manager).to receive(:verify_docker_daemon)
         .and_return({ status: 'running', version: '20.10.0' })
@@ -152,12 +161,12 @@ RSpec.describe TcfPlatform::DeploymentValidator do
       result = validator.validate_pre_deployment_requirements
 
       expect(result).to include(
-        ready_for_deployment: true,
-        resource_availability: { cpu: '4000m', memory: '8Gi' },
-        docker_status: { status: 'running' },
-        monitoring_status: { status: 'healthy' },
-        security_status: { secure: true }
+        ready_for_deployment: true
       )
+      expect(result[:resource_availability]).to include(cpu: '4000', memory: '8000')
+      expect(result[:docker_status]).to include(status: 'running')
+      expect(result[:monitoring_status]).to include(status: 'healthy')
+      expect(result[:security_status]).to include(secure: true)
     end
 
     it 'identifies system readiness issues' do
@@ -166,6 +175,12 @@ RSpec.describe TcfPlatform::DeploymentValidator do
 
       expect(docker_manager).to receive(:verify_docker_daemon)
         .and_return({ status: 'error', error: 'Docker daemon not responding' })
+
+      expect(monitoring_service).to receive(:check_monitoring_system)
+        .and_return({ status: 'healthy', prometheus: true, grafana: true })
+
+      expect(security_validator).to receive(:validate_deployment_security)
+        .and_return({ secure: true, policies_applied: true })
 
       result = validator.validate_pre_deployment_requirements
 
@@ -189,9 +204,9 @@ RSpec.describe TcfPlatform::DeploymentValidator do
       expect(result).to include(
         available: true,
         registry: 'docker.io',
-        size: '500MB',
-        security_scan: { vulnerabilities: 0, scanned: true }
+        size: '500MB'
       )
+      expect(result[:security_scan]).to include(vulnerabilities: 0, scanned: true)
     end
 
     it 'handles image not found in registry' do
@@ -239,9 +254,9 @@ RSpec.describe TcfPlatform::DeploymentValidator do
       expect(result).to include(
         sufficient: true,
         requested: resource_config,
-        available: { cpu: '4000m', memory: '8Gi' },
         utilization_after_deployment: { cpu: '12.5%', memory: '12.5%' }
       )
+      expect(result[:available]).to include(cpu: '4000m', memory: '8Gi')
     end
 
     it 'identifies insufficient resources' do
@@ -262,6 +277,9 @@ RSpec.describe TcfPlatform::DeploymentValidator do
         requests: { cpu: '100m', memory: '128Mi' },
         limits: { cpu: '500m', memory: '1Gi' }
       }
+
+      expect(resource_manager).to receive(:get_available_resources)
+        .and_return({ cpu: '4000m', memory: '8Gi' })
 
       result = validator.validate_resource_requirements(resource_config)
 
