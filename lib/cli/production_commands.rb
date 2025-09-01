@@ -176,11 +176,7 @@ module TcfPlatform
 
             # Confirm rollback unless forced
             unless options[:force]
-              puts "⚠️  This will rollback the production environment."
-              print "Are you sure you want to continue? (y/N): "
-              confirmation = $stdin.gets.chomp.downcase
-              
-              unless confirmation == 'y' || confirmation == 'yes'
+              unless confirm_rollback
                 puts "Rollback cancelled"
                 return
               end
@@ -612,6 +608,13 @@ module TcfPlatform
         end
 
         # Helper methods
+
+        def confirm_rollback
+          puts "⚠️  This will rollback the production environment."
+          print "Are you sure you want to continue? (y/N): "
+          confirmation = $stdin.gets.chomp.downcase
+          confirmation == 'y' || confirmation == 'yes'
+        end
 
         def create_production_monitor
           config_manager = TcfPlatform::ConfigManager.new
