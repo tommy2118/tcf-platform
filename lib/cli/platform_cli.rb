@@ -9,6 +9,7 @@ require_relative 'repository_commands'
 require_relative 'dev_commands'
 require_relative 'backup_commands'
 require_relative 'monitoring_commands'
+require_relative 'production_commands'
 
 module TcfPlatform
   # Main CLI class for TCF Platform management
@@ -20,6 +21,7 @@ module TcfPlatform
     include DevCommands
     include BackupCommands
     include MonitoringCommands
+    include ProductionCommands
 
     class_option :verbose, type: :boolean, default: false, desc: 'Enable verbose output'
 
@@ -110,6 +112,14 @@ module TcfPlatform
         puts '  tcf-platform monitor-status     # Show monitoring status (--verbose)'
         puts '  tcf-platform monitor-dashboard  # Start web dashboard (--port 3001)'
         puts '  tcf-platform monitor-cleanup    # Clean expired metrics (--dry-run)'
+        puts ''
+        puts 'Production Commands:'
+        puts '  tcf-platform prod deploy VERSION   # Deploy to production (--strategy blue_green)'
+        puts '  tcf-platform prod rollback [VER]   # Rollback deployment (--to-version, --service)'
+        puts '  tcf-platform prod status           # Production status (--services, --health, --metrics)'
+        puts '  tcf-platform prod audit            # Security audit (--comprehensive, --output FILE)'
+        puts '  tcf-platform prod validate         # Validate readiness (--version, --security-scan)'
+        puts '  tcf-platform prod monitor          # Manage monitoring (--action start/stop/status)'
         puts ''
         puts 'Options:'
         puts '  [--verbose], [--no-verbose]  # Enable verbose output'

@@ -27,6 +27,11 @@ module TcfPlatform
   class NetworkError < ConfigurationError; end
   class ServiceConfigurationError < ConfigurationError; end
 
+  # Deployment-specific exception classes
+  class ContainerStartupError < StandardError; end
+  class TrafficSwitchError < StandardError; end
+  class LoadBalancerError < StandardError; end
+
   # Exception helper module
   module ConfigurationExceptions
     def self.validation_error(message, field: nil, value: nil)
