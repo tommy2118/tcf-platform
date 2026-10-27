@@ -289,7 +289,7 @@ module TcfPlatform
         services = %w[gateway personas workflows projects context tokens]
         healthy_services = []
         unhealthy_services = []
-        critical_services = %w[gateway postgres redis]
+        critical_services = %w[gateway]  # Only include services we actually check
 
         services.each do |service|
           health = @monitoring_service.check_service_health(service)
